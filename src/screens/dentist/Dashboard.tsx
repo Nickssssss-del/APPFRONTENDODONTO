@@ -8,7 +8,23 @@ import {
 import { useApp } from '@/store';
 import { Badge, Button } from '@/components/ui';
 import type { AgendaPatient, AppointmentStatus } from '@/types';
-import { getPatientsByDay, getPatientById } from '@/lib/dentistData';
+import { getPatientsByDay, getPatientById, WEEK_SCHEDULE } from '@/lib/dentistData';
+
+const TREATMENT_PRICES: Record<string, number> = {
+  'Limpieza Dental Profunda': 80,
+  'Consulta General': 50,
+  'Consulta General / Diagnóstico': 50,
+  'Urgencia / Dolor Agudo': 60,
+};
+
+function calculateDailyIncome(): { day: string; income: number }[] {
+  return WEEK_SCHEDULE.map((d) => {
+    const income = d.patients
+      .filter((p) => p.guaranteePaid)
+      .reduce((sum, p) => sum + (TREATMENT_PRICES[p.treatment] ?? 0), 0);
+    return { day: d.dayLabel, income };
+  });
+}
 
 type DashboardProps = {
   dentistName: string;
@@ -34,7 +50,9 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
   const nextPatientRecord = nextPatient ? getPatientById(nextPatient.id) : undefined;
 
   const todayCount = todayPatients.length;
-  const monthIncome = 3840;
+  const dailyIncome = calculateDailyIncome();
+  const maxIncome = Math.max(...dailyIncome.map((d) => d.income), 1);
+  const weekTotal = dailyIncome.reduce((s, d) => s + d.income, 0);
   const monthPatients = 48;
   const occupancyRate = 78;
   const monthStrikes = 2;
@@ -259,7 +277,7 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
       {/* 2x2 Metrics Grid */}
       <div className="grid grid-cols-2 gap-3">
         {[
-          { icon: DollarSign, label: 'Ingresos del mes', value: `S/ ${monthIncome.toLocaleString()}`, sub: '+12% vs mes anterior', color: 'primary' as const },
+          { icon: DollarSign, label: 'Ingresos de la semana', value: `S/ ${weekTotal.toLocaleString()}`, sub: 'Calculado de citas pagadas', color: 'primary' as const },
           { icon: Users, label: 'Pacientes atendidos', value: String(monthPatients), sub: '48 este mes', color: 'success' as const },
           { icon: TrendingUp, label: 'Tasa de ocupación', value: `${occupancyRate}%`, sub: '+5% vs mes anterior', color: 'accent' as const },
           { icon: AlertTriangle, label: 'Strikes registrados', value: String(monthStrikes), sub: '2 este mes', color: 'error' as const },
@@ -290,6 +308,37 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
             </motion.div>
           );
         })}
+      </div>
+
+      {/* Ingresos por día — Bar Chart */}
+      <div className="bg-white rounded-2xl p-5 border border-slatey-100">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-primary-500" />
+            <h3 className="text-sm font-bold text-slatey-900">Ingresos por día</h3>
+          </div>
+          <Badge variant="primary" size="sm">Total: S/ {weekTotal.toLocaleString()}</Badge>
+        </div>
+        <div className="flex items-end justify-between gap-2 h-40">
+          {dailyIncome.map((d, i) => {
+            const heightPct = (d.income / maxIncome) * 100;
+            return (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slatey-700">S/{d.income}</span>
+                <div className="w-full flex-1 flex items-end">
+                  <motion.div
+                    initial={{ height: 0 }}
+                    animate={{ height: `${heightPct}%` }}
+                    transition={{ delay: i * 0.08, type: 'spring', stiffness: 120, damping: 20 }}
+                    className={`w-full rounded-t-lg ${d.income > 0 ? 'bg-gradient-to-t from-primary-500 to-primary-400' : 'bg-slatey-100'}`}
+                    style={{ minHeight: d.income > 0 ? 8 : 2 }}
+                  />
+                </div>
+                <span className="text-[10px] font-semibold text-slatey-500">{d.day}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Today's Agenda Preview */}
