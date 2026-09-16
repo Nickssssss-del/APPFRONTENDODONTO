@@ -1,6 +1,7 @@
 export type Role = 'patient' | 'dentist';
 
 export type Screen =
+  | 'splash'
   | 'onboarding'
   | 'marketplace'
   | 'checkout'

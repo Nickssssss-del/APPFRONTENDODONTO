@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, User as UserIcon, ShieldCheck,
 } from 'lucide-react';
 import { useApp } from '@/store';
-import { Badge, Button } from '@/components/ui';
+import { Badge } from '@/components/ui';
 import type { AgendaPatient, AppointmentStatus } from '@/types';
 import { getPatientsByDay, getPatientById, WEEK_SCHEDULE } from '@/lib/dentistData';
 
@@ -24,6 +24,40 @@ function calculateDailyIncome(): { day: string; income: number }[] {
       .reduce((sum, p) => sum + (TREATMENT_PRICES[p.treatment] ?? 0), 0);
     return { day: d.dayLabel, income };
   });
+}
+
+function IncomeBar({ day, income, heightPct, index }: { day: string; income: number; heightPct: number; index: number }) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      className="flex-1 flex flex-col items-center gap-1"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onTouchStart={() => setHovered(true)}
+      onTouchEnd={() => setHovered(false)}
+    >
+      <div className="relative w-full" style={{ height: 120 }}>
+        <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-slatey-700 whitespace-nowrap">
+          S/ {income.toLocaleString()}
+        </span>
+        {hovered && (
+          <span className="absolute -top-14 left-1/2 -translate-x-1/2 bg-slatey-900 text-white text-[10px] font-semibold px-1.5 py-0.5 rounded whitespace-nowrap z-10">
+            S/ {income.toLocaleString()}
+          </span>
+        )}
+        <div className="w-full h-full flex items-end">
+          <motion.div
+            initial={{ height: 0 }}
+            animate={{ height: `${heightPct}%` }}
+            transition={{ delay: index * 0.08, type: 'spring', stiffness: 120, damping: 20 }}
+            className={`w-full rounded-t-lg ${income > 0 ? 'bg-gradient-to-t from-primary-500 to-primary-400' : 'bg-slatey-100'}`}
+            style={{ minHeight: income > 0 ? 8 : 2 }}
+          />
+        </div>
+      </div>
+      <span className="text-[10px] font-semibold text-slatey-500">{day}</span>
+    </div>
+  );
 }
 
 type DashboardProps = {
@@ -319,23 +353,17 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
           </div>
           <Badge variant="primary" size="sm">Total: S/ {weekTotal.toLocaleString()}</Badge>
         </div>
-        <div className="flex items-end justify-between gap-2 h-40">
+        <div className="flex justify-between gap-2">
           {dailyIncome.map((d, i) => {
-            const heightPct = (d.income / maxIncome) * 100;
+            const heightPct = maxIncome > 0 ? (d.income / maxIncome) * 100 : 0;
             return (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                <span className="text-[10px] font-bold text-slatey-700">S/{d.income}</span>
-                <div className="w-full flex-1 flex items-end">
-                  <motion.div
-                    initial={{ height: 0 }}
-                    animate={{ height: `${heightPct}%` }}
-                    transition={{ delay: i * 0.08, type: 'spring', stiffness: 120, damping: 20 }}
-                    className={`w-full rounded-t-lg ${d.income > 0 ? 'bg-gradient-to-t from-primary-500 to-primary-400' : 'bg-slatey-100'}`}
-                    style={{ minHeight: d.income > 0 ? 8 : 2 }}
-                  />
-                </div>
-                <span className="text-[10px] font-semibold text-slatey-500">{d.day}</span>
-              </div>
+              <IncomeBar
+                key={i}
+                day={d.day}
+                income={d.income}
+                heightPct={heightPct}
+                index={i}
+              />
             );
           })}
         </div>

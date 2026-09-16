@@ -1,27 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Clock, CheckCircle2, AlertCircle, ChevronDown, ChevronUp,
+  Clock, AlertCircle, ChevronDown, ChevronUp,
   ShieldCheck, ArrowRight, Phone, Mail, MessageCircle, User,
 } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
-import type { AgendaPatient, AppointmentStatus } from '@/types';
-
-const DATES = [
-  { day: 'Lun', date: '15', full: 'Lunes 15 Sep' },
-  { day: 'Mar', date: '16', full: 'Martes 16 Sep' },
-  { day: 'Mié', date: '17', full: 'Miércoles 17 Sep' },
-  { day: 'Jue', date: '18', full: 'Jueves 18 Sep' },
-  { day: 'Vie', date: '19', full: 'Viernes 19 Sep' },
-  { day: 'Sáb', date: '20', full: 'Sábado 20 Sep' },
-];
-
-const AGENDA_DATA: AgendaPatient[] = [
-  { id: '1', name: 'Juan Pérez Rojas', dni: '87654321', age: '35', time: '10:00', treatment: 'Limpieza Dental Profunda', status: 'CONFIRMED', guaranteePaid: true, photo: 'https://images.pexels.com/photos/1681010/pexels-photo-1681010.jpeg?auto=compress&cs=tinysrgb&h=120&w=120', phone: '999 888 777', email: 'juan.perez@gmail.com', whatsapp: '999888777' },
-  { id: '2', name: 'Ana Torres Quispe', dni: '23456789', age: '42', time: '11:00', treatment: 'Consulta General', status: 'CONFIRMED', guaranteePaid: true, photo: 'https://images.pexels.com/photos/1239291/pexels-photo-1239291.jpeg?auto=compress&cs=tinysrgb&h=120&w=120', phone: '998 777 666', email: 'ana.torres@gmail.com', whatsapp: '998777666' },
-  { id: '3', name: 'Luis Ramírez Soto', dni: '34567890', age: '31', time: '14:00', treatment: 'Urgencia / Dolor Agudo', status: 'IN_PROGRESS', guaranteePaid: true, photo: 'https://images.pexels.com/photos/1222271/pexels-photo-1222271.jpeg?auto=compress&cs=tinysrgb&h=120&w=120', phone: '997 666 555', email: 'luis.ramirez@gmail.com', whatsapp: '997666555' },
-  { id: '4', name: 'Carmen Díaz Vargas', dni: '45678901', age: '26', time: '15:00', treatment: 'Limpieza Dental Profunda', status: 'PENDING_PAYMENT', guaranteePaid: false, photo: 'https://images.pexels.com/photos/1130626/pexels-photo-1130626.jpeg?auto=compress&cs=tinysrgb&h=120&w=120', phone: '996 555 444', email: 'carmen.diaz@gmail.com', whatsapp: '996555444' },
-];
+import type { AppointmentStatus } from '@/types';
+import { WEEK_SCHEDULE } from '@/lib/dentistData';
 
 const statusConfig: Record<AppointmentStatus, { label: string; variant: 'success' | 'primary' | 'warning' | 'error' | 'neutral'; dot: string }> = {
   CONFIRMED: { label: 'Confirmada', variant: 'success', dot: 'bg-success-500' },
@@ -40,6 +25,10 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
   const [selectedDateIdx, setSelectedDateIdx] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  const dayPatients = WEEK_SCHEDULE[selectedDateIdx]?.patients ?? [];
+  // Alternative using the helper function:
+  // const dayPatients = getPatientsByDay(selectedDateIdx);
+
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
   };
@@ -48,7 +37,7 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
     <div className="space-y-4">
       {/* Date Carousel */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
-        {DATES.map((d, i) => {
+        {WEEK_SCHEDULE.map((d, i) => {
           const active = selectedDateIdx === i;
           return (
             <button
@@ -58,21 +47,21 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
                 active ? 'border-primary-500 bg-primary-500 text-white' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'
               }`}
             >
-              <span className="text-xs font-semibold">{d.day}</span>
-              <span className="text-lg font-extrabold">{d.date}</span>
+              <span className="text-xs font-semibold">{d.dayLabel}</span>
+              <span className="text-lg font-extrabold">{d.dateNumber}</span>
             </button>
           );
         })}
       </div>
 
       <div className="flex items-center justify-between px-1">
-        <h3 className="text-sm font-bold text-slatey-900">{DATES[selectedDateIdx].full}</h3>
-        <Badge variant="primary" size="sm">{AGENDA_DATA.length} citas</Badge>
+        <h3 className="text-sm font-bold text-slatey-900">{WEEK_SCHEDULE[selectedDateIdx]?.fullDate ?? ''}</h3>
+        <Badge variant="primary" size="sm">{dayPatients.length} citas</Badge>
       </div>
 
       {/* Appointment Cards */}
       <div className="space-y-3">
-        {AGENDA_DATA.map((patient, i) => {
+        {dayPatients.map((patient, i) => {
           const isExpanded = expandedId === patient.id;
           const status = statusConfig[patient.status];
           return (

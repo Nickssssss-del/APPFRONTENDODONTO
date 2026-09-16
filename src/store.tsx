@@ -39,6 +39,8 @@ type AppState = {
   setRememberMe: (b: boolean) => void;
   showWelcomeBanner: boolean;
   setShowWelcomeBanner: (b: boolean) => void;
+  splashComplete: boolean;
+  setSplashComplete: (b: boolean) => void;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -62,7 +64,7 @@ export const DNI_DATABASE: Record<string, { name: string; age: string }> = {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('patient');
-  const [screen, setScreen] = useState<Screen>('onboarding');
+  const [screen, setScreen] = useState<Screen>('splash');
   const [selectedTreatment, setSelectedTreatment] = useState<Treatment>(TREATMENTS[0]);
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [holdSeconds, setHoldSeconds] = useState(600);
@@ -85,6 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
+  const [splashComplete, setSplashComplete] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -167,6 +170,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         session,
         rememberMe, setRememberMe,
         showWelcomeBanner, setShowWelcomeBanner,
+        splashComplete, setSplashComplete,
       }}
     >
       {children}
