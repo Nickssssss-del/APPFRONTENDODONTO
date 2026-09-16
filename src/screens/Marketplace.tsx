@@ -103,6 +103,9 @@ export default function Marketplace() {
             <div className="flex-1 min-w-0">
               <h2 className="text-lg font-bold text-slatey-900 font-display">Dr. Carlos Mendoza</h2>
               <p className="text-sm text-slatey-500">Odontólogo General · Lima</p>
+              <p className="text-xs text-slatey-600 mt-2 leading-relaxed italic">
+                "Apasionado por crear sonrisas saludables. Más de 10 años de experiencia en odontología general y estética dental."
+              </p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <Badge variant="success" size="sm">
                   <BadgeCheck className="w-3.5 h-3.5" />

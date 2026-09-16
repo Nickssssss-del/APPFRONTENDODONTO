@@ -34,6 +34,7 @@ export default function Profile() {
   const [ruc, setRuc] = useState('20123456789');
   const [email, setEmail] = useState('dr.mendoza@odontosystem.pe');
   const [phone, setPhone] = useState('999 888 777');
+  const [bio, setBio] = useState('Apasionado por crear sonrisas saludables. Más de 10 años de experiencia en odontología general y estética dental.');
   const [clinicPhotos, setClinicPhotos] = useState<string[]>(CLINIC_PHOTOS);
   const [schedule, setSchedule] = useState(DEFAULT_SCHEDULE);
   const [saving, setSaving] = useState(false);
@@ -97,6 +98,21 @@ export default function Profile() {
         </div>
         <Input label="Correo" value={email} onChange={setEmail} type="email" icon={<Mail className="w-5 h-5" />} />
         <Input label="Teléfono" value={phone} onChange={setPhone} type="tel" icon={<Phone className="w-5 h-5" />} />
+        <div>
+          <label className="block text-sm font-semibold text-slatey-700 mb-1.5">Descripción / Sobre mí</label>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value.slice(0, 200))}
+            placeholder="Escribe una breve biografía o frase llamativa para atraer pacientes nuevos..."
+            rows={3}
+            maxLength={200}
+            className="w-full px-4 py-3.5 rounded-2xl border-2 border-slatey-200 bg-slatey-50 text-slatey-900 placeholder:text-slatey-400 focus:border-primary-400 focus:bg-white focus:outline-none transition-all text-sm resize-none"
+          />
+          <div className="flex items-center justify-between mt-1.5">
+            <p className="text-xs text-slatey-400">Visible en tu perfil público para pacientes</p>
+            <span className={`text-xs font-semibold ${bio.length > 180 ? 'text-error-500' : 'text-slatey-400'}`}>{bio.length}/200</span>
+          </div>
+        </div>
       </div>
 
       {/* Clinic Gallery */}
