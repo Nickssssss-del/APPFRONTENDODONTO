@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, Clock, FileText, Image as ImageIcon, Pill,
   Stethoscope, Upload, Download, Calendar, Activity,
-  CheckCircle2, Plus, Maximize2, X, Loader2,
+  CheckCircle2, Plus, Maximize2, X, Loader2, CalendarClock, Pencil, Check,
 } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
 import type { ClinicalEntry } from '@/types';
@@ -27,6 +27,10 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
   const [showAddNote, setShowAddNote] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [editingNextAppt, setEditingNextAppt] = useState(false);
+  const [nextApptDate, setNextApptDate] = useState('2026-10-15');
+  const [nextApptTime, setNextApptTime] = useState('10:00');
+  const [nextApptSaved, setNextApptSaved] = useState(false);
 
   const patient = getPatientById(patientId);
   const record = getPatientRecord(patientId);
@@ -225,6 +229,98 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
           })}
         </div>
       </div>
+
+      {/* Sugerencia de próxima cita */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-gradient-to-br from-primary-50 to-primary-100/50 rounded-2xl p-5 border-2 border-primary-200"
+      >
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-9 h-9 rounded-xl bg-primary-500 flex items-center justify-center">
+            <CalendarClock className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slatey-900">Sugerencia de próxima cita</h3>
+            <p className="text-xs text-slatey-500">Según tu último tratamiento: {record.currentTreatment}</p>
+          </div>
+        </div>
+
+        {!editingNextAppt ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-white border border-primary-100">
+              <Calendar className="w-5 h-5 text-primary-500 flex-shrink-0" />
+              <div className="flex-1">
+                <p className="text-xs text-slatey-500">Fecha sugerida</p>
+                <p className="text-sm font-bold text-slatey-900">
+                  {new Date(nextApptDate + 'T00:00:00').toLocaleDateString('es-PE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-primary-500" />
+                <span className="text-sm font-bold text-slatey-900">{nextApptTime}</span>
+              </div>
+            </div>
+            {nextApptSaved && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-success-50 border border-success-100"
+              >
+                <Check className="w-4 h-4 text-success-500 flex-shrink-0" />
+                <span className="text-xs font-semibold text-success-700">Fecha confirmada según tu disponibilidad</span>
+              </motion.div>
+            )}
+            <button
+              onClick={() => { setEditingNextAppt(true); setNextApptSaved(false); }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-500 text-white text-sm font-bold hover:bg-primary-600 transition-colors"
+            >
+              <Pencil className="w-4 h-4" /> Modificar según mi disponibilidad
+            </button>
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="space-y-3"
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slatey-700 mb-1.5">Nueva fecha</label>
+                <input
+                  type="date"
+                  value={nextApptDate}
+                  onChange={(e) => setNextApptDate(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-slatey-200 bg-white text-slatey-900 focus:border-primary-400 focus:outline-none text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slatey-700 mb-1.5">Nueva hora</label>
+                <input
+                  type="time"
+                  value={nextApptTime}
+                  onChange={(e) => setNextApptTime(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl border-2 border-slatey-200 bg-white text-slatey-900 focus:border-primary-400 focus:outline-none text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEditingNextAppt(false)}
+                className="flex-1 py-2.5 rounded-xl border-2 border-slatey-200 text-slatey-600 text-sm font-semibold hover:bg-slatey-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { setEditingNextAppt(false); setNextApptSaved(true); }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-success-500 text-white text-sm font-bold hover:bg-success-600 transition-colors"
+              >
+                <Check className="w-4 h-4" /> Confirmar
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </motion.div>
 
       {/* Full-screen Image Preview */}
       <AnimatePresence>
