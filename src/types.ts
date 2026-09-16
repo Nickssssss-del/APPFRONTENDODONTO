@@ -7,7 +7,8 @@ export type Screen =
   | 'checkout'
   | 'patientDashboard'
   | 'dentistPanel'
-  | 'chatbot';
+  | 'chatbot'
+  | 'dentistProfile';
 
 export type Treatment = {
   id: string;

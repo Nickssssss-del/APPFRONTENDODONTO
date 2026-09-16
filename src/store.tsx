@@ -41,6 +41,8 @@ type AppState = {
   setShowWelcomeBanner: (b: boolean) => void;
   splashComplete: boolean;
   setSplashComplete: (b: boolean) => void;
+  selectedDentistId: string | null;
+  setSelectedDentistId: (id: string | null) => void;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -88,6 +90,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [splashComplete, setSplashComplete] = useState(false);
+  const [selectedDentistId, setSelectedDentistId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -171,6 +174,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         rememberMe, setRememberMe,
         showWelcomeBanner, setShowWelcomeBanner,
         splashComplete, setSplashComplete,
+        selectedDentistId, setSelectedDentistId,
       }}
     >
       {children}

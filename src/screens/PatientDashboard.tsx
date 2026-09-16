@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock, MapPin, Star, Lock, FileText, AlertCircle, MessageCircle,
@@ -65,11 +65,96 @@ const DENTIST_LOCATIONS: DentistLocation[] = [
 ];
 
 export default function PatientDashboard() {
-  const { setScreen, setSettingsOpen, attendanceStrikes, user } = useApp();
+  const { setScreen, setSettingsOpen, attendanceStrikes, user, setSelectedDentistId } = useApp();
   const [showAppealModal, setShowAppealModal] = useState(false);
   const [appealSubmitted, setAppealSubmitted] = useState(false);
   const [waitingRoom, setWaitingRoom] = useState(false);
   const [selectedDentist, setSelectedDentist] = useState<DentistLocation | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [locationLoading, setLocationLoading] = useState<boolean>(true);
+
+  // Calculate distance between two points using Haversine formula
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const toRadians = (degrees: number) => degrees * Math.PI / 180;
+    const R = 6371; // Radius of the Earth in km
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c; // Distance in km
+  };
+
+  // Get dentists sorted by distance from user
+  const getSortedDentistsByDistance = (): DentistLocation[] => {
+    if (!userLocation) return DENTIST_LOCATIONS;
+    
+    return [...DENTIST_LOCATIONS].sort((a, b) => {
+      const distA = calculateDistance(
+        userLocation.latitude, 
+        userLocation.longitude, 
+        a.lat, 
+        a.lng
+      );
+      const distB = calculateDistance(
+        userLocation.latitude, 
+        userLocation.longitude, 
+        b.lat, 
+        b.lng
+      );
+      return distA - distB;
+    });
+  };
+
+  // Get distance for a specific dentist
+  const getDistanceToDentist = (dentist: DentistLocation): number | null => {
+    if (!userLocation) return null;
+    return calculateDistance(
+      userLocation.latitude, 
+      userLocation.longitude, 
+      dentist.lat, 
+      dentist.lng
+    );
+  };
+
+// Initialize geolocation
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by your browser");
+      setLocationLoading(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+        setLocationLoading(false);
+      },
+      (error) => {
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            setLocationError("User denied the request for Geolocation");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setLocationError("Location information is unavailable");
+            break;
+          case error.TIMEOUT:
+            setLocationError("The request to get user location timed out");
+            break;
+          default:
+            setLocationError("An unknown error occurred");
+            break;
+        }
+        setLocationLoading(false);
+      }
+    );
+  }, []);
 
   const handleAppeal = () => {
     setAppealSubmitted(true);
@@ -160,8 +245,10 @@ export default function PatientDashboard() {
               <path d="M 180 0 Q 170 100 190 200 T 210 280" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
             </svg>
 
-            {/* Location pins */}
-            {DENTIST_LOCATIONS.map((loc) => (
+{/* Location pins */}
+          {getSortedDentistsByDistance().map((loc) => {
+            const distance = getDistanceToDentist(loc);
+            return (
               <button
                 key={loc.id}
                 onClick={() => setSelectedDentist(loc)}
@@ -189,8 +276,16 @@ export default function PatientDashboard() {
                     className="absolute inset-0 rounded-full bg-primary-400"
                   />
                 </motion.div>
+                
+                {/* Distance badge */}
+                {distance !== null && (
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary-600/90 text-white text-xs font-medium px-2 py-0.5 rounded">
+                    {distance.toFixed(1)} km
+                  </div>
+                )}
               </button>
-            ))}
+            );
+          })}
 
             {/* User location */}
             <div className="absolute z-5" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
@@ -310,54 +405,75 @@ export default function PatientDashboard() {
         </span>
       </button>
 
-      {/* Dentist Popup */}
-      <Modal open={!!selectedDentist} onClose={() => setSelectedDentist(null)} className="!sm:max-w-sm">
-        {selectedDentist && (
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <img
-                src={selectedDentist.image}
-                alt={selectedDentist.name}
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-slatey-100"
-              />
-              <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-slatey-900 font-display">{selectedDentist.name}</h3>
-                <p className="text-sm text-slatey-500">{selectedDentist.specialty}</p>
-                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <Badge variant="success" size="sm">
-                    <BadgeCheck className="w-3.5 h-3.5" /> {selectedDentist.cop}
-                  </Badge>
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-accent-400 text-accent-400" />
-                    <span className="text-xs font-bold text-slatey-900">{selectedDentist.rating}</span>
-                    <span className="text-xs text-slatey-400">({selectedDentist.reviews})</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+{/* Dentist Popup */}
+       <Modal open={!!selectedDentist} onClose={() => setSelectedDentist(null)} className="!sm:max-w-sm">
+         {selectedDentist && (
+           <div className="space-y-4">
+             <div className="flex items-start gap-3">
+               <img
+                 src={selectedDentist.image}
+                 alt={selectedDentist.name}
+                 className="w-16 h-16 rounded-2xl object-cover border-2 border-slatey-100"
+               />
+               <div className="flex-1 min-w-0">
+                 <h3 className="font-bold text-slatey-900 font-display">{selectedDentist.name}</h3>
+                 <p className="text-sm text-slatey-500">{selectedDentist.specialty}</p>
+                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                   <Badge variant="success" size="sm">
+                     <BadgeCheck className="w-3.5 h-3.5" /> {selectedDentist.cop}
+                   </Badge>
+                   <div className="flex items-center gap-1">
+                     <Star className="w-3.5 h-3.5 fill-accent-400 text-accent-400" />
+                     <span className="text-xs font-bold text-slatey-900">{selectedDentist.rating}</span>
+                     <span className="text-xs text-slatey-400">({selectedDentist.reviews})</span>
+                   </div>
+                 </div>
+               </div>
+             </div>
 
-            <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-slatey-50">
-              <MapPin className="w-4 h-4 text-slatey-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-slatey-600">{selectedDentist.address}</p>
-            </div>
+             <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-slatey-50">
+               <MapPin className="w-4 h-4 text-slatey-500 flex-shrink-0 mt-0.5" />
+               <p className="text-xs text-slatey-600">{selectedDentist.address}</p>
+             </div>
 
-            <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary-50 border border-primary-100">
-              <span className="text-sm font-semibold text-slatey-700">Consulta desde</span>
-              <span className="text-lg font-bold text-primary-600">S/ {selectedDentist.price}.00</span>
-            </div>
+             <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-primary-50 border border-primary-100">
+               <span className="text-sm font-semibold text-slatey-700">Consulta desde</span>
+               <span className="text-lg font-bold text-primary-600">S/ {selectedDentist.price}.00</span>
+             </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" fullWidth onClick={() => setSelectedDentist(null)}>
-                <Phone className="w-4 h-4" /> Llamar
-              </Button>
-              <Button fullWidth onClick={() => { setSelectedDentist(null); setScreen('marketplace'); }}>
-                Reservar
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+             {/* Distance from user */}
+             {userLocation !== null && (
+               <div className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-slatey-50 border border-slatey-200">
+                 <span className="text-sm font-semibold text-slatey-700">Distancia</span>
+                 <span className="text-lg font-bold text-primary-600">
+                   {getDistanceToDentist(selectedDentist)?.toFixed(1)} km
+                 </span>
+               </div>
+             )}
+
+             <div className="flex gap-2">
+               <Button variant="outline" fullWidth onClick={() => setSelectedDentist(null)}>
+                 <Phone className="w-4 h-4" /> Llamar
+               </Button>
+               <Button fullWidth onClick={() => { setSelectedDentist(null); setScreen('marketplace'); }}>
+                 Reservar
+                 <ArrowRight className="w-4 h-4" />
+               </Button>
+               {/* Ver perfil button */}
+               <Button fullWidth onClick={() => {
+                 // Set the selected dentist ID and navigate to profile screen
+                 if (selectedDentist) {
+                   setSelectedDentistId(selectedDentist.id);
+                   setScreen('dentistProfile');
+                 }
+               }}>
+                 Ver perfil
+                 <ArrowRight className="w-4 h-4" />
+               </Button>
+             </div>
+           </div>
+       )}
+       </Modal>
 
       {/* Appeal Modal */}
       <Modal open={showAppealModal} onClose={() => setShowAppealModal(false)} title="Apelar Inasistencia">
