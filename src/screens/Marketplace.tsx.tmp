@@ -22,9 +22,9 @@ const DAYS = ['Lun 15', 'Mar 16', 'Mié 17', 'Jue 18', 'Vie 19', 'Sáb 20'];
 const TIME_SLOTS = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
 
 export default function Marketplace() {
-  const { setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser } = useApp();
-  const [selectedDay, setSelectedDay] = useState(DAYS[0]);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const { setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser, setSelectedDay, setSelectedTime } = useApp();
+  const [selectedDayLocal, setSelectedDayLocal] = useState(DAYS[0]);
+  const [selectedTimeLocal, setSelectedTimeLocal] = useState<string | null>(null);
   const [galleryIdx, setGalleryIdx] = useState(0);
   const [showDniModal, setShowDniModal] = useState(false);
   const [dniInput, setDniInput] = useState('');
@@ -33,8 +33,23 @@ export default function Marketplace() {
   const [dniName, setDniName] = useState('');
   const [dniError, setDniError] = useState(false);
 
+  // Sync local state with app state on init
+  useEffect(() => {
+    setSelectedDayLocal(selectedDay || DAYS[0]);
+    setSelectedTimeLocal(selectedTime);
+  }, [selectedDay, selectedTime]);
+
+  // Update app state when local state changes
+  useEffect(() => {
+    setSelectedDay(selectedDayLocal);
+  }, [selectedDayLocal]);
+
+  useEffect(() => {
+    setSelectedTime(selectedTimeLocal);
+  }, [selectedTimeLocal]);
+
   const handleReserveClick = () => {
-    if (!selectedTime) return;
+    if (!selectedTimeLocal) return;
     setShowDniModal(true);
   };
 
@@ -177,36 +192,35 @@ export default function Marketplace() {
             <div className="w-10 h-1.5 rounded-full bg-slatey-200" />
           </div>
 
-          <div className="px-5 pb-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-4 h-4 text-slatey-400" />
-              <span className="text-xs font-semibold text-slatey-500 uppercase tracking-wide">Selecciona día y hora</span>
-            </div>
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-              {DAYS.map((day) => (
-                <button
-                  key={day}
-                  onClick={() => setSelectedDay(day)}
-                  className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selectedDay === day ? 'border-primary-400 bg-primary-500 text-white' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
-                >
-                  {day}
-                </button>
-              ))}
-            </div>
+<div className="px-5 pb-5">
+             <div className="flex items-center gap-2 mb-3">
+               <Calendar className="w-4 h-4 text-slatey-400" />
+               <span className="text-xs font-semibold text-slatey-500 uppercase tracking-wide">Selecciona día y hora</span>
+             </div>
+             <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+{DAYS.map((day) => (
+                  <button
+                    key={day}
+                    onClick={() => setSelectedDayLocal(day)}
+                    className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selectedDayLocal === day ? 'border-primary-400 bg-primary-500 text-white' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
+                  >
+                    {day}
+                  </button>
+                ))}
 
             <div className="grid grid-cols-4 gap-2 mt-3">
-              {TIME_SLOTS.map((slot) => {
-                const selected = selectedTime === slot;
-                return (
-                  <button
-                    key={slot}
-                    onClick={() => setSelectedTime(slot)}
-                    className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selected ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
-                  >
-                    {slot}
-                  </button>
-                );
-              })}
+{TIME_SLOTS.map((slot) => {
+                 const selected = selectedTimeLocal === slot;
+                 return (
+                   <button
+                     key={slot}
+                     onClick={() => setSelectedTimeLocal(slot)}
+                     className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selected ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
+                   >
+                     {slot}
+                   </button>
+                 );
+               })}
             </div>
 
             {isHoldActive && (
@@ -337,21 +351,21 @@ export default function Marketplace() {
                 </Badge>
               </div>
 
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary-50 border border-primary-100">
-                <Clock className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                <span className="text-xs text-primary-700">
-                  Cita: {selectedDay}, {selectedTime} · {selectedTreatment.name}
-                </span>
-              </div>
+<div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary-50 border border-primary-100">
+                  <Clock className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                  <span className="text-xs text-primary-700">
+                    Cita: {selectedDayLocal}, {selectedTimeLocal} · {selectedTreatment.name}
+                  </span>
+                </div>
 
-              <Button fullWidth size="lg" onClick={handleConfirmReservation}>
-                Confirmar y continuar al pago
-                <ArrowRight className="w-5 h-5" />
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </Modal>
-    </div>
-  );
+                <Button fullWidth size="lg" onClick={handleConfirmReservation}>
+                  Confirmar y continuar al pago
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </Modal>
+      </div>
+    );
 }

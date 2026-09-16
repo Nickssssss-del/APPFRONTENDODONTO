@@ -8,6 +8,7 @@ import PatientDashboard from './screens/PatientDashboard';
 import DentistPanel from './screens/DentistPanel';
 import Chatbot from './screens/Chatbot';
 import DentistProfile from './screens/DentistProfile';
+import ConfirmarCita from './screens/ConfirmarCita';
 import SettingsModal from './components/SettingsModal';
 
 function AppContent() {
@@ -34,6 +35,7 @@ function AppContent() {
             {screen === 'dentistPanel' && <DentistPanel />}
             {screen === 'chatbot' && <Chatbot />}
             {screen === 'dentistProfile' && <DentistProfile />}
+            {screen === 'confirmarCita' && <ConfirmarCita />}
           </motion.div>
         </AnimatePresence>
 

@@ -43,6 +43,10 @@ type AppState = {
   setSplashComplete: (b: boolean) => void;
   selectedDentistId: string | null;
   setSelectedDentistId: (id: string | null) => void;
+  selectedDay: string;
+  setSelectedDay: (d: string) => void;
+  selectedTime: string | null;
+  setSelectedTime: (t: string | null) => void;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -175,6 +179,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         showWelcomeBanner, setShowWelcomeBanner,
         splashComplete, setSplashComplete,
         selectedDentistId, setSelectedDentistId,
+        selectedDay, setSelectedDay,
+        selectedTime, setSelectedTime,
       }}
     >
       {children}
