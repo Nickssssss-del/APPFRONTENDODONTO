@@ -368,7 +368,7 @@ export default function PatientDashboard() {
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => setScreen('marketplace')}
+            onClick={() => { setSelectedDentistId(null); setScreen('marketplace'); }}
             className="flex flex-col items-start gap-2 p-4 rounded-2xl bg-white border border-slatey-100 hover:border-primary-200 transition-colors text-left"
           >
             <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center">
@@ -455,7 +455,7 @@ export default function PatientDashboard() {
                <Button variant="outline" fullWidth onClick={() => setSelectedDentist(null)}>
                  <Phone className="w-4 h-4" /> Llamar
                </Button>
-               <Button fullWidth onClick={() => { setSelectedDentist(null); setScreen('marketplace'); }}>
+               <Button fullWidth onClick={() => { setSelectedDentist(null); setSelectedDentistId(null); setScreen('marketplace'); }}>
                  Reservar
                  <ArrowRight className="w-4 h-4" />
                </Button>

@@ -1,11 +1,67 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, MapPin, BadgeCheck, Clock, AlertCircle, ArrowRight, Calendar, Check,
-  CreditCard, User as UserIcon, Loader2, ShieldCheck,
+  CreditCard, User as UserIcon, Loader2, ShieldCheck, Stethoscope,
 } from 'lucide-react';
 import { useApp, TREATMENTS, formatTime, DNI_DATABASE, DAY_LABELS, DENTIST_WORK_SCHEDULE } from '../store';
 import { Button, Badge, Modal } from '../components/ui';
+import type { DentistLocation } from '@/types';
+
+const DENTISTS: DentistLocation[] = [
+  {
+    id: '1',
+    name: 'Dr. Carlos Mendoza',
+    specialty: 'Odontólogo General',
+    rating: 4.9,
+    reviews: 127,
+    cop: 'COP 34512',
+    address: 'Av. Javier Prado 1234, San Isidro',
+    lat: 40,
+    lng: 25,
+    image: 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
+    price: 80,
+  },
+  {
+    id: '2',
+    name: 'Dra. Patricia Ruiz',
+    specialty: 'Ortodoncista',
+    rating: 4.8,
+    reviews: 89,
+    cop: 'COP 28765',
+    address: 'Av. Arequipa 2345, Lince',
+    lat: 65,
+    lng: 55,
+    image: 'https://images.pexels.com/photos/6812464/pexels-photo-6812464.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
+    price: 120,
+  },
+  {
+    id: '3',
+    name: 'Dr. Miguel Torres',
+    specialty: 'Endodoncista',
+    rating: 4.7,
+    reviews: 64,
+    cop: 'COP 45123',
+    address: 'Av. Brasil 5678, Jesús María',
+    lat: 25,
+    lng: 65,
+    image: 'https://images.pexels.com/photos/37458054/pexels-photo-37458054.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
+    price: 90,
+  },
+  {
+    id: '4',
+    name: 'Dra. Lucía Vargas',
+    specialty: 'Odontopediatra',
+    rating: 5.0,
+    reviews: 152,
+    cop: 'COP 31234',
+    address: 'Av. La Marina 3456, San Miguel',
+    lat: 75,
+    lng: 30,
+    image: 'https://images.pexels.com/photos/32205053/pexels-photo-32205053.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
+    price: 70,
+  },
+];
 
 const CLINIC_IMAGES = [
   'https://images.pexels.com/photos/305567/pexels-photo-305567.jpeg?auto=compress&cs=tinysrgb&h=400&w=600',
@@ -28,7 +84,7 @@ const DAY_DATE_MAP: Record<string, string> = {
 };
 
 export default function Marketplace() {
-  const { role, setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser, selectedDentistId, isDayAvailable, getAvailableTimeSlots, selectedDay, setSelectedDay, selectedTime, setSelectedTime } = useApp();
+  const { role, setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser, selectedDentistId, setSelectedDentistId, isDayAvailable, getAvailableTimeSlots, selectedDay, setSelectedDay, selectedTime, setSelectedTime } = useApp();
   const [galleryIdx, setGalleryIdx] = useState(0);
   const [showDniModal, setShowDniModal] = useState(false);
   const [dniInput, setDniInput] = useState('');
@@ -38,6 +94,13 @@ export default function Marketplace() {
 const [dniError, setDniError] = useState(false);
 
   const currentDentistId = selectedDentistId || '1';
+  const selectedDentist = DENTISTS.find((d) => d.id === currentDentistId) || DENTISTS[0];
+
+  const handleSelectDentist = (id: string) => {
+    setSelectedDentistId(id);
+    setSelectedDay('Lun 15');
+    setSelectedTime(null);
+  };
   const currentDayLabel = selectedDay ? DAY_LABELS.find((d) => DAY_DATE_MAP[d] === selectedDay) || DAY_LABELS[0] : DAY_LABELS[0];
   const isCurrentDayAvailable = isDayAvailable(currentDentistId, currentDayLabel);
   const availableTimeSlots = isCurrentDayAvailable
@@ -86,6 +149,70 @@ const [dniError, setDniError] = useState(false);
     setDniError(false);
   };
 
+  if (!selectedDentistId) {
+    return (
+      <div className="min-h-screen bg-slatey-50">
+        {/* Header */}
+        <div className="sticky top-0 z-30 glass border-b border-slatey-100">
+          <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setScreen(role === 'patient' ? 'patientDashboard' : 'dentistPanel')}
+                className="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <div>
+                <h2 className="text-lg font-bold text-slatey-900 font-display">Dentistas disponibles</h2>
+                <p className="text-xs text-slatey-500">Elige un odontólogo para reservar</p>
+              </div>
+            </div>
+            <Badge variant="primary" size="sm">{DENTISTS.length} disponibles</Badge>
+          </div>
+        </div>
+
+        <div className="max-w-md mx-auto px-4 py-5 space-y-3">
+          {DENTISTS.map((dentist, i) => (
+            <motion.button
+              key={dentist.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.06 }}
+              onClick={() => handleSelectDentist(dentist.id)}
+              className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white border border-slatey-100 hover:border-primary-200 hover:shadow-md transition-all text-left"
+            >
+              <img src={dentist.image} alt={dentist.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-slatey-100 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-slatey-900 font-display">{dentist.name}</h3>
+                <p className="text-xs text-slatey-500 mt-0.5">{dentist.specialty}</p>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <Star className="w-3.5 h-3.5 fill-accent-400 text-accent-400" />
+                    <span className="text-xs font-bold text-slatey-900">{dentist.rating}</span>
+                    <span className="text-xs text-slatey-400">({dentist.reviews})</span>
+                  </div>
+                  <span className="text-xs text-slatey-300">·</span>
+                  <div className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-slatey-400" />
+                    <span className="text-xs text-slatey-500 truncate">{dentist.address.split(',')[1]?.trim() || dentist.address}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                <span className="text-sm font-bold text-primary-600">S/ {dentist.price}</span>
+                <span className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary-500 text-white text-xs font-bold">
+                  Reservar <ArrowRight className="w-3 h-3" />
+                </span>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
 return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50">
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
@@ -94,7 +221,7 @@ return (
         <img src={COVER_IMAGE} alt="Consultorio" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-slatey-900/70 via-slatey-900/20 to-transparent" />
         <button
-          onClick={() => setScreen(role === 'patient' ? 'patientDashboard' : 'dentistPanel')}
+          onClick={() => setSelectedDentistId(null)}
           className="absolute top-4 left-4 p-2.5 rounded-xl glass text-white hover:bg-white/20 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -113,25 +240,25 @@ return (
         <div className="bg-white rounded-3xl shadow-lg shadow-slatey-900/5 p-5">
           <div className="flex items-start gap-4">
             <img
-              src={DOCTOR_AVATAR}
-              alt="Dr. Carlos Mendoza"
+              src={selectedDentist.image}
+              alt={selectedDentist.name}
               className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md -mt-8"
             />
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold text-slatey-900 font-display">Dr. Carlos Mendoza</h2>
-              <p className="text-sm text-slatey-500">Odontólogo General · Lima</p>
+              <h2 className="text-lg font-bold text-slatey-900 font-display">{selectedDentist.name}</h2>
+              <p className="text-sm text-slatey-500">{selectedDentist.specialty} · Lima</p>
               <p className="text-xs text-slatey-600 mt-2 leading-relaxed italic">
                 "Apasionado por crear sonrisas saludables. Más de 10 años de experiencia en odontología general y estética dental."
               </p>
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <Badge variant="success" size="sm">
                   <BadgeCheck className="w-3.5 h-3.5" />
-                  COP 34512 Verificado
+                  {selectedDentist.cop} Verificado
                 </Badge>
                 <div className="flex items-center gap-1">
                   <Star className="w-4 h-4 fill-accent-400 text-accent-400" />
-                  <span className="text-sm font-bold text-slatey-900">4.9</span>
-                  <span className="text-xs text-slatey-400">(127 reseñas)</span>
+                  <span className="text-sm font-bold text-slatey-900">{selectedDentist.rating}</span>
+                  <span className="text-xs text-slatey-400">({selectedDentist.reviews} reseñas)</span>
                 </div>
               </div>
             </div>
