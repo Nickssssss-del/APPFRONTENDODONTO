@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock, MapPin, Star, Lock, FileText, AlertCircle, MessageCircle,
   Settings, Calendar, Upload, ArrowRight, CheckCircle2, Sofa,
-  Navigation, X, BadgeCheck, Stethoscope, Phone,
+  Navigation, X, BadgeCheck, Stethoscope, Phone, Maximize,
 } from 'lucide-react';
 import { useApp } from '../store';
 import { Button, Badge, Modal } from '../components/ui';
@@ -73,6 +73,7 @@ export default function PatientDashboard() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState<boolean>(true);
+  const [mapExpanded, setMapExpanded] = useState(false);
 
   // Calculate distance between two points using Haversine formula
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -164,6 +165,81 @@ export default function PatientDashboard() {
     }, 2000);
   };
 
+  const renderMapBody = () => (
+    <>
+      {/* Map grid pattern */}
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          backgroundImage: `
+            linear-gradient(to right, #CBD5E1 1px, transparent 1px),
+            linear-gradient(to bottom, #CBD5E1 1px, transparent 1px)
+          `,
+          backgroundSize: '32px 32px',
+        }}
+      />
+      {/* Fake streets */}
+      <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+        <path d="M 0 120 Q 50 100 100 110 T 200 120 T 300 115" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
+        <path d="M 0 180 Q 80 160 160 170 T 320 165" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
+        <path d="M 60 0 Q 50 80 70 160 T 90 280" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
+        <path d="M 180 0 Q 170 100 190 200 T 210 280" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
+      </svg>
+
+      {/* Location pins */}
+      {getSortedDentistsByDistance().map((loc) => {
+        const distance = getDistanceToDentist(loc);
+        return (
+          <button
+            key={loc.id}
+            onClick={() => setSelectedDentist(loc)}
+            className="absolute z-10 group"
+            style={{ left: `${loc.lng}%`, top: `${loc.lat}%`, transform: 'translate(-50%, -100%)' }}
+          >
+            <motion.div
+              initial={{ scale: 0, y: -20 }}
+              animate={{ scale: 1, y: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 20, delay: Number(loc.id) * 0.1 }}
+              className="relative"
+            >
+              <motion.div
+                animate={{ y: [0, -4, 0] }}
+                transition={{ duration: 2, repeat: Infinity, delay: Number(loc.id) * 0.3 }}
+                className="w-10 h-10 rounded-full bg-primary-500 border-2 border-white shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform"
+              >
+                <Stethoscope className="w-5 h-5 text-white" />
+              </motion.div>
+              <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-primary-500" />
+              {/* Pulse ring */}
+              <motion.div
+                animate={{ scale: [1, 2], opacity: [0.5, 0] }}
+                transition={{ duration: 2, repeat: Infinity, delay: Number(loc.id) * 0.3 }}
+                className="absolute inset-0 rounded-full bg-primary-400"
+              />
+            </motion.div>
+
+            {/* Distance badge */}
+            {distance !== null && (
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary-600/90 text-white text-xs font-medium px-2 py-0.5 rounded">
+                {distance.toFixed(1)} km
+              </div>
+            )}
+          </button>
+        );
+      })}
+
+      {/* User location */}
+      <div className="absolute z-5" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
+        <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-md" />
+        <motion.div
+          animate={{ scale: [1, 3], opacity: [0.4, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="absolute inset-0 rounded-full bg-blue-400"
+        />
+      </div>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-slatey-50 pb-24">
       {/* Header */}
@@ -226,82 +302,22 @@ export default function PatientDashboard() {
             <Badge variant="primary" size="sm">{DENTIST_LOCATIONS.length} disponibles</Badge>
           </div>
           <div className="relative w-full h-64 rounded-2xl overflow-hidden border border-slatey-200 bg-gradient-to-br from-primary-50 via-slatey-100 to-primary-50">
-            {/* Map grid pattern */}
-            <div
-              className="absolute inset-0 opacity-30"
-              style={{
-                backgroundImage: `
-                  linear-gradient(to right, #CBD5E1 1px, transparent 1px),
-                  linear-gradient(to bottom, #CBD5E1 1px, transparent 1px)
-                `,
-                backgroundSize: '32px 32px',
-              }}
-            />
-            {/* Fake streets */}
-            <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-              <path d="M 0 120 Q 50 100 100 110 T 200 120 T 300 115" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
-              <path d="M 0 180 Q 80 160 160 170 T 320 165" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
-              <path d="M 60 0 Q 50 80 70 160 T 90 280" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
-              <path d="M 180 0 Q 170 100 190 200 T 210 280" stroke="#94A3B8" strokeWidth="3" fill="none" opacity="0.4" />
-            </svg>
-
-{/* Location pins */}
-          {getSortedDentistsByDistance().map((loc) => {
-            const distance = getDistanceToDentist(loc);
-            return (
-              <button
-                key={loc.id}
-                onClick={() => setSelectedDentist(loc)}
-                className="absolute z-10 group"
-                style={{ left: `${loc.lng}%`, top: `${loc.lat}%`, transform: 'translate(-50%, -100%)' }}
-              >
-                <motion.div
-                  initial={{ scale: 0, y: -20 }}
-                  animate={{ scale: 1, y: 0 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20, delay: Number(loc.id) * 0.1 }}
-                  className="relative"
-                >
-                  <motion.div
-                    animate={{ y: [0, -4, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: Number(loc.id) * 0.3 }}
-                    className="w-10 h-10 rounded-full bg-primary-500 border-2 border-white shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform"
-                  >
-                    <Stethoscope className="w-5 h-5 text-white" />
-                  </motion.div>
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-primary-500" />
-                  {/* Pulse ring */}
-                  <motion.div
-                    animate={{ scale: [1, 2], opacity: [0.5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, delay: Number(loc.id) * 0.3 }}
-                    className="absolute inset-0 rounded-full bg-primary-400"
-                  />
-                </motion.div>
-                
-                {/* Distance badge */}
-                {distance !== null && (
-                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-primary-600/90 text-white text-xs font-medium px-2 py-0.5 rounded">
-                    {distance.toFixed(1)} km
-                  </div>
-                )}
-              </button>
-            );
-          })}
-
-            {/* User location */}
-            <div className="absolute z-5" style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}>
-              <div className="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-md" />
-              <motion.div
-                animate={{ scale: [1, 3], opacity: [0.4, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="absolute inset-0 rounded-full bg-blue-400"
-              />
-            </div>
+            {renderMapBody()}
 
             {/* Map controls */}
             <div className="absolute top-3 right-3 flex flex-col gap-1">
               <button className="w-8 h-8 rounded-lg glass flex items-center justify-center text-slatey-700 font-bold shadow-sm">+</button>
               <button className="w-8 h-8 rounded-lg glass flex items-center justify-center text-slatey-700 font-bold shadow-sm">−</button>
             </div>
+
+            {/* Expand button */}
+            <button
+              onClick={() => setMapExpanded(true)}
+              className="absolute bottom-3 right-3 w-9 h-9 rounded-lg glass flex items-center justify-center text-slatey-700 shadow-sm hover:bg-white/40 transition-colors"
+              aria-label="Expandir mapa"
+            >
+              <Maximize className="w-4 h-4" />
+            </button>
           </div>
           <p className="text-xs text-slatey-400 mt-1.5 px-1">Toca un pin para ver la información del odontólogo</p>
         </div>
@@ -474,6 +490,43 @@ export default function PatientDashboard() {
            </div>
        )}
        </Modal>
+
+      {/* Full-screen Map */}
+      <AnimatePresence>
+        {mapExpanded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-slatey-50"
+          >
+            <div className="relative w-full h-full">
+              {renderMapBody()}
+
+              {/* Close button */}
+              <button
+                onClick={() => setMapExpanded(false)}
+                className="absolute top-4 right-4 z-20 w-10 h-10 rounded-xl glass flex items-center justify-center text-slatey-700 shadow-md hover:bg-white/40 transition-colors"
+                aria-label="Cerrar mapa"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Title */}
+              <div className="absolute top-4 left-4 z-20 px-4 py-2 rounded-xl glass">
+                <h3 className="text-sm font-bold text-slatey-900">Dentistas cerca de ti</h3>
+                <p className="text-xs text-slatey-500">{DENTIST_LOCATIONS.length} disponibles</p>
+              </div>
+
+              {/* Map controls */}
+              <div className="absolute bottom-6 right-4 z-20 flex flex-col gap-1">
+                <button className="w-10 h-10 rounded-lg glass flex items-center justify-center text-slatey-700 font-bold shadow-sm">+</button>
+                <button className="w-10 h-10 rounded-lg glass flex items-center justify-center text-slatey-700 font-bold shadow-sm">−</button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Appeal Modal */}
       <Modal open={showAppealModal} onClose={() => setShowAppealModal(false)} title="Apelar Inasistencia">
