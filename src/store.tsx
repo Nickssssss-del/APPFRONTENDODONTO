@@ -47,15 +47,60 @@ type AppState = {
   setSelectedDay: (d: string) => void;
   selectedTime: string | null;
   setSelectedTime: (t: string | null) => void;
+  reservedSlots: Record<string, string[]>;
+  setReservedSlots: (slots: Record<string, string[]>) => void;
+  isDayAvailable: (dentistId: string, dayLabel: string) => boolean;
+  getAvailableTimeSlots: (dentistId: string, dayLabel: string, treatmentDuration: number) => string[];
 };
 
 const AppContext = createContext<AppState | null>(null);
 
 export const TREATMENTS: Treatment[] = [
-  { id: 'limpieza', name: 'Limpieza Dental Profunda', price: 80, description: 'Profilaxis completa con ultrasonido y pulido' },
-  { id: 'consulta', name: 'Consulta General / Diagnóstico', price: 50, description: 'Evaluación clínica y plan de tratamiento' },
-  { id: 'urgencia', name: 'Urgencia / Dolor Agudo', price: 60, description: 'Atención inmediata para dolor agudo' },
+  { id: 'limpieza', name: 'Limpieza Dental Profunda', price: 80, description: 'Profilaxis completa con ultrasonido y pulido', duration: 60 },
+  { id: 'consulta', name: 'Consulta General / Diagnóstico', price: 50, description: 'Evaluación clínica y plan de tratamiento', duration: 30 },
+  { id: 'urgencia', name: 'Urgencia / Dolor Agudo', price: 60, description: 'Atención inmediata para dolor agudo', duration: 45 },
 ];
+
+export const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
+
+export const DENTIST_WORK_SCHEDULE: Record<string, Record<string, { active: boolean; start: string; end: string }>> = {
+  '1': {
+    'Lun': { active: true, start: '08:00', end: '17:00' },
+    'Mar': { active: true, start: '08:00', end: '17:00' },
+    'Mié': { active: true, start: '08:00', end: '17:00' },
+    'Jue': { active: true, start: '08:00', end: '17:00' },
+    'Vie': { active: true, start: '08:00', end: '17:00' },
+    'Sáb': { active: true, start: '09:00', end: '14:00' },
+    'Dom': { active: false, start: '', end: '' },
+  },
+  '2': {
+    'Lun': { active: true, start: '09:00', end: '18:00' },
+    'Mar': { active: true, start: '09:00', end: '18:00' },
+    'Mié': { active: true, start: '09:00', end: '18:00' },
+    'Jue': { active: true, start: '09:00', end: '18:00' },
+    'Vie': { active: true, start: '09:00', end: '18:00' },
+    'Sáb': { active: false, start: '', end: '' },
+    'Dom': { active: false, start: '', end: '' },
+  },
+  '3': {
+    'Lun': { active: true, start: '10:00', end: '19:00' },
+    'Mar': { active: true, start: '10:00', end: '19:00' },
+    'Mié': { active: true, start: '10:00', end: '19:00' },
+    'Jue': { active: true, start: '10:00', end: '19:00' },
+    'Vie': { active: true, start: '10:00', end: '19:00' },
+    'Sáb': { active: true, start: '10:00', end: '15:00' },
+    'Dom': { active: false, start: '', end: '' },
+  },
+  '4': {
+    'Lun': { active: true, start: '08:00', end: '17:00' },
+    'Mar': { active: true, start: '08:00', end: '17:00' },
+    'Mié': { active: true, start: '08:00', end: '17:00' },
+    'Jue': { active: true, start: '08:00', end: '17:00' },
+    'Vie': { active: true, start: '08:00', end: '17:00' },
+    'Sáb': { active: true, start: '08:00', end: '13:00' },
+    'Dom': { active: false, start: '', end: '' },
+  },
+};
 
 export const DNI_DATABASE: Record<string, { name: string; age: string }> = {
   '12345678': { name: 'María González Fernández', age: '28' },
@@ -67,6 +112,17 @@ export const DNI_DATABASE: Record<string, { name: string; age: string }> = {
   '67890123': { name: 'Sofía Mendoza Cruz', age: '33' },
   '78901234': { name: 'Diego Flores Ríos', age: '38' },
 };
+
+function parseTimeToMinutes(time: string): number {
+  const parts = time.split(':');
+  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+}
+
+function formatMinutesToTime(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('patient');
@@ -95,6 +151,44 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [splashComplete, setSplashComplete] = useState(false);
   const [selectedDentistId, setSelectedDentistId] = useState<string | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string>('Lun 15');
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [reservedSlots, setReservedSlots] = useState<Record<string, string[]>>({});
+
+  const isDayAvailable = (dentistId: string, dayLabel: string): boolean => {
+    const schedule = DENTIST_WORK_SCHEDULE[dentistId];
+    if (!schedule || !schedule[dayLabel]) return false;
+    return schedule[dayLabel].active;
+  };
+
+  const getAvailableTimeSlots = (dentistId: string, dayLabel: string, treatmentDuration: number): string[] => {
+    const schedule = DENTIST_WORK_SCHEDULE[dentistId];
+    const daySchedule = schedule?.[dayLabel];
+    if (!daySchedule || !daySchedule.active) return [];
+
+    const startMin = parseTimeToMinutes(daySchedule.start);
+    const endMin = parseTimeToMinutes(daySchedule.end);
+
+    const reservedKey = dentistId + ':' + dayLabel;
+    const reserved = reservedSlots[reservedKey] || [];
+
+    const slots: string[] = [];
+    const interval = treatmentDuration;
+    let cursor = startMin;
+
+    while (cursor + interval <= endMin) {
+      const slotStr = formatMinutesToTime(cursor);
+      const isRes = reserved.some(
+        (r) => r === slotStr || (parseTimeToMinutes(r) < cursor + interval && parseTimeToMinutes(r) + treatmentDuration > cursor)
+      );
+      if (!isRes) {
+        slots.push(slotStr);
+      }
+      cursor += interval;
+    }
+
+    return slots;
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -181,6 +275,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedDentistId, setSelectedDentistId,
         selectedDay, setSelectedDay,
         selectedTime, setSelectedTime,
+        reservedSlots, setReservedSlots,
+        isDayAvailable,
+        getAvailableTimeSlots,
       }}
     >
       {children}

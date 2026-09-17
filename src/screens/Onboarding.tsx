@@ -13,15 +13,40 @@ import type { RecoverMethod } from '../types';
 type AuthStep = 'login' | 'register' | 'recover' | 'recoverOTP' | 'success' | 'error';
 
 export default function Onboarding() {
-  const { role, setRole, setScreen, setUser, setIsAuth, isAuth, rememberMe, setRememberMe, setShowWelcomeBanner, sessionLoading, session } = useApp();
+  const {
+    role,
+    setRole,
+    setScreen,
+    setUser,
+    setIsAuth,
+    isAuth,
+    rememberMe,
+    setRememberMe,
+    setShowWelcomeBanner,
+    sessionLoading,
+    session,
+    selectedDentistId,
+    setSelectedDentistId,
+    selectedDay,
+    setSelectedDay,
+    selectedTime,
+    setSelectedTime,
+  } = useApp();
+
+  const resetPatientNavigationState = () => {
+    setSelectedDentistId(null);
+    setSelectedDay('Lun 15');
+    setSelectedTime(null);
+  };
 
   useEffect(() => {
     if (sessionLoading) return;
     if (session && isAuth) {
+      resetPatientNavigationState();
       setScreen(role === 'patient' ? 'marketplace' : 'dentistPanel');
       if (role === 'dentist') setShowWelcomeBanner(true);
     }
-  }, [sessionLoading, session]);
+  }, [sessionLoading, session, role]);
   const [step, setStep] = useState<AuthStep>('login');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -80,16 +105,20 @@ export default function Onboarding() {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      const dniKey = Object.keys(DNI_DATABASE).find((k) => DNI_DATABASE[k].name.includes(email.split('@')[0].charAt(0).toUpperCase() + email.split('@')[0].slice(1))) || '12345678';
-      const profileData = DNI_DATABASE[dniKey] || DNI_DATABASE['12345678'];
+      const dniKey = Object.keys(DNI_DATABASE).find((k) =>
+        DNI_DATABASE[k].name.toLowerCase().includes(email.split('@')[0].toLowerCase())
+      );
+      const profileData = DNI_DATABASE[dniKey || '12345678'] || DNI_DATABASE['12345678'];
       setUser({
         fullName: profileData.name,
         email,
         phone: phone || '999 888 777',
-        dni: dniKey,
+        dni: dniKey || '12345678',
         age: profileData.age,
       });
       setIsAuth(true);
+      resetPatientNavigationState();
+      setScreen(role === 'patient' ? 'marketplace' : 'dentistPanel');
       if (role === 'dentist') setShowWelcomeBanner(true);
       setStep('success');
     } catch {

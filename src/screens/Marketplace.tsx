@@ -1,10 +1,10 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, MapPin, BadgeCheck, Clock, AlertCircle, ArrowRight, Calendar, Check,
   CreditCard, User as UserIcon, Loader2, ShieldCheck,
 } from 'lucide-react';
-import { useApp, TREATMENTS, formatTime, DNI_DATABASE } from '../store';
+import { useApp, TREATMENTS, formatTime, DNI_DATABASE, DAY_LABELS, DENTIST_WORK_SCHEDULE } from '../store';
 import { Button, Badge, Modal } from '../components/ui';
 
 const CLINIC_IMAGES = [
@@ -18,20 +18,37 @@ const CLINIC_IMAGES = [
 const DOCTOR_AVATAR = 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200';
 const COVER_IMAGE = 'https://images.pexels.com/photos/38055773/pexels-photo-38055773.jpeg?auto=compress&cs=tinysrgb&h=400&w=900';
 
-const DAYS = ['Lun 15', 'Mar 16', 'Mié 17', 'Jue 18', 'Vie 19', 'Sáb 20'];
-const TIME_SLOTS = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00', '17:00'];
+const DAY_DATE_MAP: Record<string, string> = {
+  'Lun': 'Lun 15',
+  'Mar': 'Mar 16',
+  'Mié': 'Mié 17',
+  'Jue': 'Jue 18',
+  'Vie': 'Vie 19',
+  'Sáb': 'Sáb 20',
+};
 
 export default function Marketplace() {
-  const { setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser } = useApp();
-  const [selectedDay, setSelectedDay] = useState(DAYS[0]);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const { role, setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser, selectedDentistId, isDayAvailable, getAvailableTimeSlots, selectedDay, setSelectedDay, selectedTime, setSelectedTime } = useApp();
   const [galleryIdx, setGalleryIdx] = useState(0);
   const [showDniModal, setShowDniModal] = useState(false);
   const [dniInput, setDniInput] = useState('');
   const [dniVerifying, setDniVerifying] = useState(false);
   const [dniVerified, setDniVerified] = useState(false);
   const [dniName, setDniName] = useState('');
-  const [dniError, setDniError] = useState(false);
+const [dniError, setDniError] = useState(false);
+
+  const currentDentistId = selectedDentistId || '1';
+  const currentDayLabel = selectedDay ? DAY_LABELS.find((d) => DAY_DATE_MAP[d] === selectedDay) || DAY_LABELS[0] : DAY_LABELS[0];
+  const isCurrentDayAvailable = isDayAvailable(currentDentistId, currentDayLabel);
+  const availableTimeSlots = isCurrentDayAvailable
+    ? getAvailableTimeSlots(currentDentistId, currentDayLabel, selectedTreatment.duration)
+    : [];
+
+  const handleDaySelect = (dayLabel: string) => {
+    if (!isDayAvailable(currentDentistId, dayLabel)) return;
+    setSelectedDay(DAY_DATE_MAP[dayLabel]);
+    setSelectedTime(null);
+  };
 
   const handleReserveClick = () => {
     if (!selectedTime) return;
@@ -69,14 +86,15 @@ export default function Marketplace() {
     setDniError(false);
   };
 
-  return (
-    <div className="min-h-screen bg-slatey-50 pb-32">
+return (
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
       {/* Cover */}
       <div className="relative h-44 overflow-hidden">
         <img src={COVER_IMAGE} alt="Consultorio" className="w-full h-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-t from-slatey-900/70 via-slatey-900/20 to-transparent" />
         <button
-          onClick={() => setScreen('onboarding')}
+          onClick={() => setScreen(role === 'patient' ? 'patientDashboard' : 'dentistPanel')}
           className="absolute top-4 left-4 p-2.5 rounded-xl glass text-white hover:bg-white/20 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -167,81 +185,100 @@ export default function Marketplace() {
               </button>
             );
           })}
-        </div>
+</div>
+      </div>
       </div>
 
       {/* Booking Sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-20">
-        <div className="max-w-md mx-auto bg-white rounded-t-3xl shadow-2xl shadow-slatey-900/10 border-t border-slatey-100">
-          <div className="flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1.5 rounded-full bg-slatey-200" />
+      <div className="shrink-0 flex flex-col max-h-[55vh] bg-white rounded-t-3xl shadow-2xl shadow-slatey-900/10 border-t border-slatey-100 overflow-hidden">
+          <div className="flex-shrink-0 flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1.5 rounded-full bg-slatey-200" aria-hidden="true" />
           </div>
 
-          <div className="px-5 pb-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Calendar className="w-4 h-4 text-slatey-400" />
-              <span className="text-xs font-semibold text-slatey-500 uppercase tracking-wide">Selecciona día y hora</span>
+          <div className="px-5 min-h-0 overflow-y-auto scrollbar-hide">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Calendar className="w-4 h-4 text-slatey-400" />
+                    <span className="text-xs font-semibold text-slatey-500 uppercase tracking-wide">Selecciona día y hora</span>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+                    {DAY_LABELS.map((dayLabel) => {
+                      const day = DAY_DATE_MAP[dayLabel];
+                      const available = isDayAvailable(currentDentistId, dayLabel);
+                      const isSelected = selectedDay === day;
+                      return (
+                        <button
+                          key={day}
+                          onClick={() => handleDaySelect(dayLabel)}
+                          disabled={!available}
+                          className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${isSelected ? 'border-primary-400 bg-primary-500 text-white' : available ? 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300' : 'border-slatey-200 bg-slatey-100 text-slatey-400 cursor-not-allowed'}`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {!isCurrentDayAvailable ? (
+                    <div className="mt-3 flex items-center gap-3 p-4 rounded-xl bg-accent-50 border border-accent-200">
+                      <AlertCircle className="w-5 h-5 text-accent-600 flex-shrink-0" />
+                      <p className="text-sm text-accent-700">El odontólogo no atiende este día</p>
+                    </div>
+                  ) : availableTimeSlots.length === 0 ? (
+                    <div className="mt-3 text-center py-4">
+                      <p className="text-sm text-slatey-500">No hay horarios disponibles para este día</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2 mt-3">
+                      {availableTimeSlots.map((slot) => {
+                        const selected = selectedTime === slot;
+                        return (
+                          <button
+                            key={slot}
+                            onClick={() => setSelectedTime(slot)}
+                            className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selected ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
+                          >
+                            {slot}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {isHoldActive && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-accent-50 border border-accent-200"
+                    >
+                      <AlertCircle className="w-4 h-4 text-accent-600 flex-shrink-0" />
+                      <span className="text-xs font-semibold text-accent-700">
+                        Horario bloqueado por {formatTime(holdSeconds)} min
+                      </span>
+</motion.div>
+                  )}
+
             </div>
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-              {DAYS.map((day) => (
-                <button
-                  key={day}
-                  onClick={() => setSelectedDay(day)}
-                  className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selectedDay === day ? 'border-primary-400 bg-primary-500 text-white' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
+
+            <div className="flex-shrink-0 border-t border-slatey-100 px-5 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-xs text-slatey-500">Garantía de reserva</p>
+                  <p className="text-lg font-bold text-slatey-900">S/ 20.00</p>
+                </div>
+                <Button
+                  size="lg"
+                  disabled={!selectedTime}
+                  onClick={handleReserveClick}
+                  className="flex-1"
                 >
-                  {day}
-                </button>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-4 gap-2 mt-3">
-              {TIME_SLOTS.map((slot) => {
-                const selected = selectedTime === slot;
-                return (
-                  <button
-                    key={slot}
-                    onClick={() => setSelectedTime(slot)}
-                    className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selected ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
-                  >
-                    {slot}
-                  </button>
-                );
-              })}
-            </div>
-
-            {isHoldActive && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-accent-50 border border-accent-200"
-              >
-                <AlertCircle className="w-4 h-4 text-accent-600 flex-shrink-0" />
-                <span className="text-xs font-semibold text-accent-700">
-                  Horario bloqueado por {formatTime(holdSeconds)} min
-                </span>
-              </motion.div>
-            )}
-
-            <div className="mt-4 flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-xs text-slatey-500">Garantía de reserva</p>
-                <p className="text-lg font-bold text-slatey-900">S/ 20.00</p>
+                  Reservar Cita
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
               </div>
-              <Button
-                size="lg"
-                disabled={!selectedTime}
-                onClick={handleReserveClick}
-                className="flex-1"
-              >
-                Reservar Cita
-                <ArrowRight className="w-5 h-5" />
-              </Button>
+              <p className="text-xs text-slatey-400 text-center mt-2">
+                Garantía S/ 20.00 · 100% reembolsable con 24h de anticipación
+              </p>
             </div>
-            <p className="text-xs text-slatey-400 text-center mt-2">
-              Garantía S/ 20.00 · 100% reembolsable con 24h de anticipación
-            </p>
-          </div>
-        </div>
       </div>
 
       {/* DNI Verification Modal */}
@@ -355,3 +392,4 @@ export default function Marketplace() {
     </div>
   );
 }
+

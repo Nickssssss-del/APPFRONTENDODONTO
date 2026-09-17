@@ -11,11 +11,14 @@ export type Screen =
   | 'dentistProfile'
   | 'confirmarCita';
 
+export type DayLabel = 'Lun' | 'Mar' | 'Mié' | 'Jue' | 'Vie' | 'Sáb' | 'Dom';
+
 export type Treatment = {
   id: string;
   name: string;
   price: number;
   description: string;
+  duration: number;
 };
 
 export type PaymentMethod = 'yape' | 'plin' | 'card';
@@ -118,7 +121,19 @@ export type DentistProfile = {
   phone: string;
   photo: string;
   clinicPhotos: string[];
-  workDays: Record<string, { active: boolean; start: string; end: string }>;
+  workDays: Record<DayLabel, { active: boolean; start: string; end: string }>;
+};
+
+export type ConfirmedAppointment = {
+  dentistId: string;
+  dayLabel: DayLabel;
+  start: string;
+  duration: number;
+};
+
+export type AppointmentSlot = ConfirmedAppointment & {
+  end: string;
+  available: boolean;
 };
 
 export type SessionInfo = {
