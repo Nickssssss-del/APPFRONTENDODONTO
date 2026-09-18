@@ -11,7 +11,7 @@ import { Button, Badge } from '@/components/ui';
 import type { DentistProfile } from '@/types';
 
 export default function DentistProfile() {
-  const { setScreen, selectedDentistId } = useApp();
+  const { setScreen, selectedDentistId, agendaLocked } = useApp();
   
   // Mock dentist profile data - in a real app this would come from an API
   const dentistProfiles: Record<string, DentistProfile> = {
@@ -223,9 +223,9 @@ export default function DentistProfile() {
 
             {/* Action Buttons */}
             <div className="space-y-4">
-              <Button fullWidth onClick={handleReserve}>
-                Reservar Cita
-                <ArrowRight className="w-4 h-4" />
+              <Button fullWidth disabled={selectedDentistId === '1' && agendaLocked} onClick={handleReserve}>
+                {selectedDentistId === '1' && agendaLocked ? 'No disponible temporalmente' : 'Reservar Cita'}
+                {!(selectedDentistId === '1' && agendaLocked) && <ArrowRight className="w-4 h-4" />}
               </Button>
               <Button fullWidth variant="outline" onClick={handleBack}>
                 Regresar al Listado

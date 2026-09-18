@@ -7,6 +7,7 @@ import {
 import { Badge, Button } from '@/components/ui';
 import type { AppointmentStatus } from '@/types';
 import { WEEK_SCHEDULE } from '@/lib/dentistData';
+import { useApp } from '@/store';
 
 const statusConfig: Record<AppointmentStatus, { label: string; variant: 'success' | 'primary' | 'warning' | 'error' | 'neutral'; dot: string }> = {
   CONFIRMED: { label: 'Confirmada', variant: 'success', dot: 'bg-success-500' },
@@ -22,12 +23,33 @@ type AgendaProps = {
 };
 
 export default function Agenda({ onGoToPatient }: AgendaProps) {
+  const { dentistWorkSchedules, appointmentRequests } = useApp();
+  const dentistId = '1'; // Dr. Carlos Mendoza is dentist 1
+  const schedule = dentistWorkSchedules[dentistId] || {};
+
   const [selectedDateIdx, setSelectedDateIdx] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  const dayPatients = WEEK_SCHEDULE[selectedDateIdx]?.patients ?? [];
-  // Alternative using the helper function:
-  // const dayPatients = getPatientsByDay(selectedDateIdx);
+  const selectedDayLabel = WEEK_SCHEDULE[selectedDateIdx]?.dayLabel ?? 'Lun';
+  const approvedRequests = appointmentRequests
+    .filter((request) => request.status === 'CONFIRMED' && request.dentistId === dentistId && request.dayLabel === selectedDayLabel)
+    .map((request) => ({
+      id: request.id,
+      name: request.patientName,
+      dni: request.patientDni,
+      age: request.patientAge,
+      time: request.selectedTime,
+      treatment: request.treatment.name,
+      status: 'CONFIRMED' as const,
+      guaranteePaid: true,
+      photo: 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&h=120&w=120',
+      phone: request.patientPhone,
+      email: request.patientEmail,
+      whatsapp: request.patientPhone.replace(/\s/g, ''),
+    }));
+  const dayPatients = [...(WEEK_SCHEDULE[selectedDateIdx]?.patients ?? []), ...approvedRequests]
+    .sort((a, b) => a.time.localeCompare(b.time));
+  const isAvailable = schedule[selectedDayLabel]?.active ?? true;
 
   const toggleExpand = (id: string) => {
     setExpandedId(expandedId === id ? null : id);
@@ -39,12 +61,19 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
       <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
         {WEEK_SCHEDULE.map((d, i) => {
           const active = selectedDateIdx === i;
+          const dayAvailable = schedule[d.dayLabel]?.active ?? true;
           return (
             <button
               key={i}
               onClick={() => setSelectedDateIdx(i)}
               className={`flex-shrink-0 flex flex-col items-center gap-0.5 px-4 py-3 rounded-2xl border-2 transition-all min-w-[64px] ${
-                active ? 'border-primary-500 bg-primary-500 text-white' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'
+                active 
+                  ? dayAvailable 
+                    ? 'border-primary-500 bg-primary-500 text-white' 
+                    : 'border-slatey-400 bg-slatey-400 text-white opacity-75'
+                  : dayAvailable 
+                    ? 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300' 
+                    : 'border-slatey-100 bg-slatey-100 text-slatey-400 opacity-50'
               }`}
             >
               <span className="text-xs font-semibold">{d.dayLabel}</span>
@@ -53,6 +82,13 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
           );
         })}
       </div>
+
+      {!isAvailable && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-slatey-100 border border-slatey-200 text-slatey-500">
+          <AlertCircle className="w-5 h-5 text-slatey-400 flex-shrink-0" />
+          <p className="text-sm font-semibold text-slatey-600">Día no habilitado según tu horario configurado</p>
+        </div>
+      )}
 
       <div className="flex items-center justify-between px-1">
         <h3 className="text-sm font-bold text-slatey-900">{WEEK_SCHEDULE[selectedDateIdx]?.fullDate ?? ''}</h3>

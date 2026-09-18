@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, DollarSign, TrendingUp, Users, Clock,
   ArrowRight, Lock, Unlock, AlertTriangle,
-  CheckCircle2, XCircle, User as UserIcon, ShieldCheck,
+  CheckCircle2, XCircle, User as UserIcon, ShieldCheck, RefreshCw,
 } from 'lucide-react';
 import { useApp } from '@/store';
 import { Badge } from '@/components/ui';
@@ -69,8 +69,7 @@ type DashboardProps = {
 type MarkResult = 'completed' | 'no_show' | null;
 
 export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: DashboardProps) {
-  const { showWelcomeBanner, setShowWelcomeBanner } = useApp();
-  const [agendaLocked, setAgendaLocked] = useState(false);
+  const { showWelcomeBanner, setShowWelcomeBanner, agendaLocked, setAgendaLocked, appointmentRequests, approveAppointmentRequest, requestAppointmentReschedule } = useApp();
   const [markResult, setMarkResult] = useState<MarkResult>(null);
   const [marking, setMarking] = useState(false);
 
@@ -90,6 +89,7 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
   const monthPatients = 48;
   const occupancyRate = 78;
   const monthStrikes = 2;
+  const pendingRequests = appointmentRequests.filter((request) => request.status === 'PENDING_APPROVAL');
 
   const handleMark = (result: 'completed' | 'no_show') => {
     setMarking(true);
@@ -164,6 +164,43 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
           )}
         </AnimatePresence>
       </motion.button>
+
+      {pendingRequests.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <h3 className="text-sm font-bold text-slatey-900">Solicitudes de cita pendientes</h3>
+            <Badge variant="warning" size="sm">{pendingRequests.length} nuevas</Badge>
+          </div>
+          {pendingRequests.map((request) => (
+            <div key={request.id} className="bg-white rounded-2xl border border-accent-200 p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center flex-shrink-0">
+                  <UserIcon className="w-5 h-5 text-primary-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slatey-900">{request.patientName}</p>
+                  <p className="text-xs text-slatey-500">DNI {request.patientDni} · {request.patientAge} años</p>
+                  <p className="text-xs font-semibold text-slatey-700 mt-1">{request.selectedDay} · {request.selectedTime} · {request.treatment.name}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => approveAppointmentRequest(request.id)}
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-success-500 py-2.5 text-xs font-bold text-white hover:bg-success-600"
+                >
+                  <CheckCircle2 className="w-4 h-4" /> Aprobar
+                </button>
+                <button
+                  onClick={() => requestAppointmentReschedule(request.id)}
+                  className="flex items-center justify-center gap-1.5 rounded-xl bg-accent-50 py-2.5 text-xs font-bold text-accent-700 hover:bg-accent-100"
+                >
+                  <RefreshCw className="w-4 h-4" /> Solicitar reprogramación
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* PRÓXIMO PACIENTE — Amplified Featured Card */}
       {nextPatient && nextPatientRecord && (
@@ -389,6 +426,12 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
             >
               <img src={apt.photo} alt={apt.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
               <div className="flex-1 min-w-0">
+        {agendaLocked && (
+          <div className="mt-3 flex items-center gap-2.5 p-3 rounded-xl bg-error-50 border border-error-100 text-error-700">
+            <Lock className="w-4 h-4 flex-shrink-0" />
+            <p className="text-xs font-semibold">Agenda bloqueada — no se aceptan nuevas reservas</p>
+          </div>
+        )}
                 <div className="flex items-center gap-2">
                   <Clock className="w-3 h-3 text-slatey-400" />
                   <span className="text-xs font-bold text-slatey-900">{apt.time}</span>

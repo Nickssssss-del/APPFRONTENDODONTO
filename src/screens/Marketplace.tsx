@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, MapPin, BadgeCheck, Clock, AlertCircle, ArrowRight, Calendar, Check,
@@ -84,7 +84,7 @@ const DAY_DATE_MAP: Record<string, string> = {
 };
 
 export default function Marketplace() {
-  const { role, setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser, selectedDentistId, setSelectedDentistId, isDayAvailable, getAvailableTimeSlots, selectedDay, setSelectedDay, selectedTime, setSelectedTime } = useApp();
+  const { role, setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser, selectedDentistId, setSelectedDentistId, isDayAvailable, getAvailableTimeSlots, selectedDay, setSelectedDay, selectedTime, setSelectedTime, agendaLocked, reschedulingRequestId, appointmentRequests } = useApp();
   const [galleryIdx, setGalleryIdx] = useState(0);
   const [showDniModal, setShowDniModal] = useState(false);
   const [dniInput, setDniInput] = useState('');
@@ -95,12 +95,20 @@ const [dniError, setDniError] = useState(false);
 
   const currentDentistId = selectedDentistId || '1';
   const selectedDentist = DENTISTS.find((d) => d.id === currentDentistId) || DENTISTS[0];
+  const isDentistUnavailable = selectedDentist.id === '1' && agendaLocked;
+  const reschedulingRequest = appointmentRequests.find((request) => request.id === reschedulingRequestId);
 
   const handleSelectDentist = (id: string) => {
     setSelectedDentistId(id);
     setSelectedDay('Lun 15');
     setSelectedTime(null);
   };
+
+  useEffect(() => {
+    if (reschedulingRequest && selectedDay === 'Lun 15') {
+      setSelectedDay(reschedulingRequest.selectedDay);
+    }
+  }, [reschedulingRequest, selectedDay, setSelectedDay]);
   const currentDayLabel = selectedDay ? DAY_LABELS.find((d) => DAY_DATE_MAP[d] === selectedDay) || DAY_LABELS[0] : DAY_LABELS[0];
   const isCurrentDayAvailable = isDayAvailable(currentDentistId, currentDayLabel);
   const availableTimeSlots = isCurrentDayAvailable
@@ -202,8 +210,9 @@ const [dniError, setDniError] = useState(false);
               </div>
               <div className="flex flex-col items-end gap-2 flex-shrink-0">
                 <span className="text-sm font-bold text-primary-600">S/ {dentist.price}</span>
-                <span className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-primary-500 text-white text-xs font-bold">
-                  Reservar <ArrowRight className="w-3 h-3" />
+                <span className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold ${dentist.id === '1' && agendaLocked ? 'bg-slatey-200 text-slatey-500' : 'bg-primary-500 text-white'}`}>
+                  {dentist.id === '1' && agendaLocked ? 'No disponible temporalmente' : 'Reservar'}
+                  {!(dentist.id === '1' && agendaLocked) && <ArrowRight className="w-3 h-3" />}
                 </span>
               </div>
             </motion.button>
@@ -394,12 +403,12 @@ return (
                 </div>
                 <Button
                   size="lg"
-                  disabled={!selectedTime}
+                  disabled={!selectedTime || isDentistUnavailable}
                   onClick={handleReserveClick}
                   className="flex-1"
                 >
-                  Reservar Cita
-                  <ArrowRight className="w-5 h-5" />
+                  {isDentistUnavailable ? 'No disponible temporalmente' : 'Reservar Cita'}
+                  {!isDentistUnavailable && <ArrowRight className="w-5 h-5" />}
                 </Button>
               </div>
               <p className="text-xs text-slatey-400 text-center mt-2">

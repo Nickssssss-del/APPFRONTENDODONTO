@@ -2,11 +2,23 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, User, Mail, Phone, BadgeCheck, CreditCard,
-  Clock, Plus, X, Check, Calendar,
+  Clock, Plus, X, Check, Calendar, AlertTriangle, Eye,
 } from 'lucide-react';
-import { Button, Input, Badge } from '@/components/ui';
+import { Button, Input, Badge, Modal } from '@/components/ui';
+import { useApp } from '@/store';
+import { WEEK_SCHEDULE } from '@/lib/dentistData';
 
 const DEFAULT_PHOTO = 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200';
+
+const DAY_SHORT_MAP: Record<string, string> = {
+  Lunes: 'Lun',
+  Martes: 'Mar',
+  Miércoles: 'Mié',
+  Jueves: 'Jue',
+  Viernes: 'Vie',
+  Sábado: 'Sáb',
+  Domingo: 'Dom',
+};
 
 const CLINIC_PHOTOS = [
   'https://images.pexels.com/photos/305567/pexels-photo-305567.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
@@ -27,6 +39,20 @@ const DEFAULT_SCHEDULE: Record<string, { active: boolean; start: string; end: st
 };
 
 export default function Profile() {
+  const { dentistWorkSchedules, setDentistWorkSchedules } = useApp();
+  const dentistId = '1'; // Dr. Carlos Mendoza is dentist 1
+  const storeSchedule = dentistWorkSchedules[dentistId];
+
+  const initialSchedule = {
+    Lunes: { active: storeSchedule?.['Lun']?.active ?? true, start: storeSchedule?.['Lun']?.start ?? '08:00', end: storeSchedule?.['Lun']?.end ?? '17:00' },
+    Martes: { active: storeSchedule?.['Mar']?.active ?? true, start: storeSchedule?.['Mar']?.start ?? '08:00', end: storeSchedule?.['Mar']?.end ?? '17:00' },
+    Miércoles: { active: storeSchedule?.['Mié']?.active ?? true, start: storeSchedule?.['Mié']?.start ?? '08:00', end: storeSchedule?.['Mié']?.end ?? '17:00' },
+    Jueves: { active: storeSchedule?.['Jue']?.active ?? true, start: storeSchedule?.['Jue']?.start ?? '08:00', end: storeSchedule?.['Jue']?.end ?? '17:00' },
+    Viernes: { active: storeSchedule?.['Vie']?.active ?? true, start: storeSchedule?.['Vie']?.start ?? '08:00', end: storeSchedule?.['Vie']?.end ?? '17:00' },
+    Sábado: { active: storeSchedule?.['Sáb']?.active ?? true, start: storeSchedule?.['Sáb']?.start ?? '09:00', end: storeSchedule?.['Sáb']?.end ?? '14:00' },
+    Domingo: { active: storeSchedule?.['Dom']?.active ?? false, start: storeSchedule?.['Dom']?.start ?? '09:00', end: storeSchedule?.['Dom']?.end ?? '13:00' },
+  };
+
   const [photo, setPhoto] = useState(DEFAULT_PHOTO);
   const [fullName, setFullName] = useState('Dr. Carlos Mendoza');
   const [specialty, setSpecialty] = useState('Odontólogo General');
@@ -36,17 +62,70 @@ export default function Profile() {
   const [phone, setPhone] = useState('999 888 777');
   const [bio, setBio] = useState('Apasionado por crear sonrisas saludables. Más de 10 años de experiencia en odontología general y estética dental.');
   const [clinicPhotos, setClinicPhotos] = useState<string[]>(CLINIC_PHOTOS);
-  const [schedule, setSchedule] = useState(DEFAULT_SCHEDULE);
+  const [schedule, setSchedule] = useState<Record<string, { active: boolean; start: string; end: string }>>(initialSchedule);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
+  const [warningModalOpen, setWarningModalOpen] = useState(false);
+  const [warningDaysList, setWarningDaysList] = useState<{ day: string; count: number; patients: any[] }[]>([]);
+
+  const checkScheduleWarnings = (newSchedule: typeof schedule) => {
+    const warningDays: { day: string; count: number; patients: any[] }[] = [];
+    Object.entries(newSchedule).forEach(([dayName, config]) => {
+      if (!config.active) {
+        const shortLabel = DAY_SHORT_MAP[dayName];
+        const daySched = WEEK_SCHEDULE.find(s => s.dayLabel === shortLabel);
+        if (daySched && daySched.patients.length > 0) {
+          warningDays.push({
+            day: dayName,
+            count: daySched.patients.length,
+            patients: daySched.patients
+          });
+        }
+      }
+    });
+    return warningDays;
+  };
+
+  const executeSave = (newSchedule: typeof schedule) => {
     setSaving(true);
+    const updatedStoreSchedule: Record<string, { active: boolean; start: string; end: string }> = {};
+    Object.entries(newSchedule).forEach(([dayName, config]) => {
+      const shortLabel = DAY_SHORT_MAP[dayName];
+      if (shortLabel) {
+        updatedStoreSchedule[shortLabel] = {
+          active: config.active,
+          start: config.start,
+          end: config.end
+        };
+      }
+    });
+
+    setDentistWorkSchedules({
+      ...dentistWorkSchedules,
+      [dentistId]: updatedStoreSchedule
+    });
+
     setTimeout(() => {
       setSaving(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     }, 1200);
+  };
+
+  const handleSave = () => {
+    const warnings = checkScheduleWarnings(schedule);
+    if (warnings.length > 0) {
+      setWarningDaysList(warnings);
+      setWarningModalOpen(true);
+    } else {
+      executeSave(schedule);
+    }
+  };
+
+  const handleConfirmSaveWithWarnings = () => {
+    setWarningModalOpen(false);
+    executeSave(schedule);
   };
 
   const toggleDay = (day: string) => {
@@ -230,6 +309,54 @@ export default function Profile() {
           )}
         </Button>
       </div>
+
+      {/* Warning Modal */}
+      <Modal open={warningModalOpen} onClose={() => setWarningModalOpen(false)} title="Advertencia de Citas">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-error-50 border border-error-100">
+            <AlertTriangle className="w-5 h-5 text-error-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-bold text-error-800">Citas agendadas en días no disponibles</p>
+              <p className="text-xs text-error-700 leading-relaxed mt-0.5">
+                Has desactivado días que actualmente tienen citas agendadas. Debes reprogramarlas o notificar a los pacientes.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+            {warningDaysList.map((wd) => (
+              <div key={wd.day} className="p-3 rounded-xl bg-slatey-50 border border-slatey-100 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-bold text-slatey-900">{wd.day}</span>
+                  <Badge variant="error" size="sm">
+                    {wd.count} {wd.count === 1 ? 'cita agendada' : 'citas agendadas'}
+                  </Badge>
+                </div>
+                <div className="space-y-1.5 pl-1">
+                  {wd.patients.map((pat) => (
+                    <div key={pat.id} className="flex items-center justify-between text-xs text-slatey-600 bg-white p-2 rounded-lg border border-slatey-100">
+                      <div>
+                        <p className="font-semibold text-slatey-800">{pat.name}</p>
+                        <p className="text-[10px] text-slatey-400">{pat.treatment}</p>
+                      </div>
+                      <span className="font-bold text-slatey-700">{pat.time}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="outline" fullWidth onClick={() => setWarningModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="primary" fullWidth onClick={handleConfirmSaveWithWarnings}>
+              Guardar de todas formas
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

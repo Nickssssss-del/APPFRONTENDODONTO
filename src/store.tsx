@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, SessionInfo } from './types';
+import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, SessionInfo, AppointmentRequest, DayLabel } from './types';
 import { supabase } from './lib/supabase';
 
 type AppState = {
@@ -47,10 +47,21 @@ type AppState = {
   setSelectedDay: (d: string) => void;
   selectedTime: string | null;
   setSelectedTime: (t: string | null) => void;
+  agendaLocked: boolean;
+  setAgendaLocked: (locked: boolean) => void;
+  appointmentRequests: AppointmentRequest[];
+  createAppointmentRequest: (request: Omit<AppointmentRequest, 'id' | 'status' | 'createdAt'>) => void;
+  approveAppointmentRequest: (id: string) => void;
+  requestAppointmentReschedule: (id: string) => void;
+  rescheduleAppointmentRequest: (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => void;
+  reschedulingRequestId: string | null;
+  setReschedulingRequestId: (id: string | null) => void;
   reservedSlots: Record<string, string[]>;
   setReservedSlots: (slots: Record<string, string[]>) => void;
   isDayAvailable: (dentistId: string, dayLabel: string) => boolean;
   getAvailableTimeSlots: (dentistId: string, dayLabel: string, treatmentDuration: number) => string[];
+  dentistWorkSchedules: Record<string, Record<string, { active: boolean; start: string; end: string }>>;
+  setDentistWorkSchedules: (s: Record<string, Record<string, { active: boolean; start: string; end: string }>>) => void;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -153,16 +164,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedDentistId, setSelectedDentistId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('Lun 15');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [agendaLocked, setAgendaLocked] = useState(false);
+  const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+  const [reschedulingRequestId, setReschedulingRequestId] = useState<string | null>(null);
   const [reservedSlots, setReservedSlots] = useState<Record<string, string[]>>({});
+  const [dentistWorkSchedules, setDentistWorkSchedules] = useState<Record<string, Record<string, { active: boolean; start: string; end: string }>>>(DENTIST_WORK_SCHEDULE);
 
   const isDayAvailable = (dentistId: string, dayLabel: string): boolean => {
-    const schedule = DENTIST_WORK_SCHEDULE[dentistId];
+    const schedule = dentistWorkSchedules[dentistId];
     if (!schedule || !schedule[dayLabel]) return false;
     return schedule[dayLabel].active;
   };
 
   const getAvailableTimeSlots = (dentistId: string, dayLabel: string, treatmentDuration: number): string[] => {
-    const schedule = DENTIST_WORK_SCHEDULE[dentistId];
+    const schedule = dentistWorkSchedules[dentistId];
     const daySchedule = schedule?.[dayLabel];
     if (!daySchedule || !daySchedule.active) return [];
 
@@ -188,6 +203,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     return slots;
+  };
+
+  const reserveSlot = (dentistId: string, dayLabel: string, time: string) => {
+    const reservedKey = dentistId + ':' + dayLabel;
+    setReservedSlots((current) => ({
+      ...current,
+      [reservedKey]: Array.from(new Set([...(current[reservedKey] || []), time])),
+    }));
+  };
+
+  const releaseSlot = (dentistId: string, dayLabel: string, time: string) => {
+    const reservedKey = dentistId + ':' + dayLabel;
+    setReservedSlots((current) => ({
+      ...current,
+      [reservedKey]: (current[reservedKey] || []).filter((reservedTime) => reservedTime !== time),
+    }));
+  };
+
+  const createAppointmentRequest = (request: Omit<AppointmentRequest, 'id' | 'status' | 'createdAt'>) => {
+    if (reschedulingRequestId) {
+      rescheduleAppointmentRequest(reschedulingRequestId, request.dayLabel, request.selectedDay, request.selectedTime);
+      return;
+    }
+
+    const newRequest: AppointmentRequest = {
+      ...request,
+      id: `request-${Date.now()}`,
+      status: 'PENDING_APPROVAL',
+      createdAt: Date.now(),
+    };
+    setAppointmentRequests((current) => [...current, newRequest]);
+    reserveSlot(request.dentistId, request.dayLabel, request.selectedTime);
+  };
+
+  const approveAppointmentRequest = (id: string) => {
+    setAppointmentRequests((current) => current.map((request) => (
+      request.id === id ? { ...request, status: 'CONFIRMED' } : request
+    )));
+  };
+
+  const requestAppointmentReschedule = (id: string) => {
+    const request = appointmentRequests.find((item) => item.id === id);
+    if (!request) return;
+    releaseSlot(request.dentistId, request.dayLabel, request.selectedTime);
+    setAppointmentRequests((current) => current.map((item) => (
+      item.id === id ? { ...item, status: 'RESCHEDULE_REQUESTED' } : item
+    )));
+  };
+
+  const rescheduleAppointmentRequest = (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => {
+    const request = appointmentRequests.find((item) => item.id === id);
+    if (!request) return;
+    releaseSlot(request.dentistId, request.dayLabel, request.selectedTime);
+    reserveSlot(request.dentistId, dayLabel, selectedTime);
+    setAppointmentRequests((current) => current.map((item) => (
+      item.id === id
+        ? { ...item, dayLabel, selectedDay, selectedTime, status: 'PENDING_APPROVAL', createdAt: Date.now() }
+        : item
+    )));
+    setReschedulingRequestId(null);
   };
 
   useEffect(() => {
@@ -275,9 +350,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedDentistId, setSelectedDentistId,
         selectedDay, setSelectedDay,
         selectedTime, setSelectedTime,
+        agendaLocked, setAgendaLocked,
+        appointmentRequests,
+        createAppointmentRequest,
+        approveAppointmentRequest,
+        requestAppointmentReschedule,
+        rescheduleAppointmentRequest,
+        reschedulingRequestId,
+        setReschedulingRequestId,
         reservedSlots, setReservedSlots,
         isDayAvailable,
         getAvailableTimeSlots,
+        dentistWorkSchedules,
+        setDentistWorkSchedules,
       }}
     >
       {children}

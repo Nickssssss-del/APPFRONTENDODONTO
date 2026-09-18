@@ -4,14 +4,14 @@ import {
   ArrowLeft, CheckCircle2, FileText, ShieldCheck, Upload, CreditCard,
   Calendar, Clock, AlertCircle, Check, XCircle, Loader2, PartyPopper,
 } from 'lucide-react';
-import { useApp, formatTime } from '../store';
+import { useApp, formatTime, DAY_LABELS } from '../store';
 import { Button, Badge, Modal } from '../components/ui';
 import type { PaymentMethod } from '../types';
 
 type PayState = 'idle' | 'processing' | 'success' | 'error';
 
 export default function Checkout() {
-  const { setScreen, selectedTreatment, holdSeconds, isHoldActive, user } = useApp();
+  const { setScreen, selectedTreatment, selectedDay, selectedTime, holdSeconds, isHoldActive, user, createAppointmentRequest } = useApp();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('yape');
   const [operationNumber, setOperationNumber] = useState('');
   const [payState, setPayState] = useState<PayState>('idle');
@@ -27,6 +27,19 @@ export default function Checkout() {
     setTimeout(() => {
       if (Math.random() > 0.15) {
         setPayState('success');
+        const dayLabel = DAY_LABELS.find((label) => selectedDay.startsWith(label)) || 'Lun';
+        createAppointmentRequest({
+          dentistId: '1',
+          patientName: user.fullName || 'María González',
+          patientDni: user.dni || '12345678',
+          patientAge: user.age || '28',
+          patientEmail: user.email,
+          patientPhone: user.phone,
+          treatment: selectedTreatment,
+          dayLabel,
+          selectedDay,
+          selectedTime: selectedTime || '10:00',
+        });
         setTimeout(() => setShowSuccess(true), 600);
       } else {
         setPayState('error');
@@ -300,10 +313,10 @@ export default function Checkout() {
               <>Procesando pago...</>
             ) : payState === 'success' ? (
               <>
-                <CheckCircle2 className="w-5 h-5" /> Cita Confirmada
+                <CheckCircle2 className="w-5 h-5" /> Solicitud enviada
               </>
             ) : (
-              <>Pagar S/ {guarantee.toFixed(2)} y Confirmar Cita</>
+                <>Pagar S/ {guarantee.toFixed(2)} y Solicitar Cita</>
             )}
           </Button>
         </div>
@@ -345,7 +358,7 @@ export default function Checkout() {
             transition={{ delay: 0.2 }}
             className="text-xl font-bold text-slatey-900 font-display mb-2 relative z-10"
           >
-            ¡Cita confirmada!
+            ¡Solicitud enviada!
           </motion.h3>
           <motion.p
             initial={{ opacity: 0, y: 10 }}
@@ -353,7 +366,7 @@ export default function Checkout() {
             transition={{ delay: 0.3 }}
             className="text-sm text-slatey-500 mb-6 relative z-10"
           >
-            Tu cita con el Dr. Carlos Mendoza el Lun 15 a las 10:00 AM ha sido reservada. Recibirás una confirmación en tu calendario de Google.
+            Tu solicitud con el Dr. Carlos Mendoza fue enviada. El odontólogo debe confirmarla antes de que quede reservada.
           </motion.p>
           <div className="w-full space-y-2 mb-6 relative z-10">
             <div className="flex justify-between text-sm">

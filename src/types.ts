@@ -46,6 +46,24 @@ export type Reservation = {
   operationNumber?: string;
 };
 
+export type AppointmentRequestStatus = 'PENDING_APPROVAL' | 'CONFIRMED' | 'RESCHEDULE_REQUESTED';
+
+export type AppointmentRequest = {
+  id: string;
+  dentistId: string;
+  patientName: string;
+  patientDni: string;
+  patientAge: string;
+  patientEmail: string;
+  patientPhone: string;
+  treatment: Treatment;
+  dayLabel: DayLabel;
+  selectedDay: string;
+  selectedTime: string;
+  status: AppointmentRequestStatus;
+  createdAt: number;
+};
+
 export type UserProfile = {
   fullName: string;
   email: string;

@@ -65,7 +65,7 @@ const DENTIST_LOCATIONS: DentistLocation[] = [
 ];
 
 export default function PatientDashboard() {
-  const { setScreen, setSettingsOpen, attendanceStrikes, user, setSelectedDentistId } = useApp();
+  const { setScreen, setSettingsOpen, attendanceStrikes, user, setSelectedDentistId, agendaLocked, appointmentRequests, setReschedulingRequestId } = useApp();
   const [showAppealModal, setShowAppealModal] = useState(false);
   const [appealSubmitted, setAppealSubmitted] = useState(false);
   const [waitingRoom, setWaitingRoom] = useState(false);
@@ -74,6 +74,7 @@ export default function PatientDashboard() {
   const [locationError, setLocationError] = useState<string | null>(null);
   const [locationLoading, setLocationLoading] = useState<boolean>(true);
   const [mapExpanded, setMapExpanded] = useState(false);
+  const activeRequest = appointmentRequests[appointmentRequests.length - 1];
 
   // Calculate distance between two points using Haversine formula
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -267,21 +268,38 @@ export default function PatientDashboard() {
         >
           <div className="flex items-center gap-2 mb-3">
             <Calendar className="w-4 h-4 text-primary-100" />
-            <span className="text-xs font-semibold text-primary-100 uppercase tracking-wide">Cita hoy</span>
+            <span className="text-xs font-semibold text-primary-100 uppercase tracking-wide">{activeRequest ? 'Solicitud de cita' : 'Cita hoy'}</span>
           </div>
           <div className="flex items-start justify-between mb-4">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Clock className="w-5 h-5" />
-                <span className="text-2xl font-extrabold font-display">10:00 AM</span>
+                <span className="text-2xl font-extrabold font-display">{activeRequest?.selectedTime || '10:00'}{activeRequest ? '' : ' AM'}</span>
               </div>
               <p className="text-sm text-primary-100">Dr. Carlos Mendoza</p>
-              <p className="text-xs text-primary-200 mt-0.5">Limpieza Dental Profunda</p>
+              <p className="text-xs text-primary-200 mt-0.5">{activeRequest?.treatment.name || 'Limpieza Dental Profunda'}</p>
             </div>
             <Badge className="bg-white/20 text-white border-white/30">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Confirmada
+              {activeRequest?.status === 'PENDING_APPROVAL' && <Clock className="w-3.5 h-3.5" />}
+              {activeRequest?.status === 'RESCHEDULE_REQUESTED' && <AlertCircle className="w-3.5 h-3.5" />}
+              {(!activeRequest || activeRequest.status === 'CONFIRMED') && <CheckCircle2 className="w-3.5 h-3.5" />}
+              {!activeRequest ? 'Confirmada' : activeRequest.status === 'PENDING_APPROVAL' ? 'Pendiente de aprobación' : activeRequest.status === 'RESCHEDULE_REQUESTED' ? 'Reprogramación solicitada' : 'Confirmada'}
             </Badge>
           </div>
+          {activeRequest?.status === 'PENDING_APPROVAL' && (
+            <p className="text-xs text-primary-100 mb-3">El odontólogo debe revisar y confirmar tu solicitud antes de que la cita quede reservada.</p>
+          )}
+          {activeRequest?.status === 'RESCHEDULE_REQUESTED' && (
+            <div className="mb-3 rounded-xl bg-white/15 p-3">
+              <p className="text-xs text-primary-100 mb-2">El odontólogo solicitó elegir otro horario entre los bloques disponibles.</p>
+              <button
+                onClick={() => { setReschedulingRequestId(activeRequest.id); setSelectedDentistId(activeRequest.dentistId); setScreen('marketplace'); }}
+                className="w-full rounded-xl bg-white px-3 py-2 text-sm font-bold text-primary-600"
+              >
+                Elegir otro horario
+              </button>
+            </div>
+          )}
           <div className="flex gap-2">
             <button className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 transition-colors text-sm font-semibold">
               <Navigation className="w-4 h-4" /> Cómo llegar
@@ -471,9 +489,9 @@ export default function PatientDashboard() {
                <Button variant="outline" fullWidth onClick={() => setSelectedDentist(null)}>
                  <Phone className="w-4 h-4" /> Llamar
                </Button>
-               <Button fullWidth onClick={() => { setSelectedDentist(null); setSelectedDentistId(null); setScreen('marketplace'); }}>
-                 Reservar
-                 <ArrowRight className="w-4 h-4" />
+               <Button fullWidth disabled={selectedDentist.id === '1' && agendaLocked} onClick={() => { setSelectedDentist(null); setSelectedDentistId(null); setScreen('marketplace'); }}>
+                 {selectedDentist.id === '1' && agendaLocked ? 'No disponible temporalmente' : 'Reservar'}
+                 {!(selectedDentist.id === '1' && agendaLocked) && <ArrowRight className="w-4 h-4" />}
                </Button>
                {/* Ver perfil button */}
                <Button fullWidth onClick={() => {
