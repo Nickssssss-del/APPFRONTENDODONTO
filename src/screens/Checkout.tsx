@@ -65,7 +65,7 @@ export default function Checkout() {
   ];
 
   return (
-    <div className="min-h-screen bg-slatey-50">
+    <div className="min-h-screen bg-slatey-50 pb-24">
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">

@@ -5,14 +5,30 @@ import Onboarding from './screens/Onboarding';
 import Marketplace from './screens/Marketplace';
 import Checkout from './screens/Checkout';
 import PatientDashboard from './screens/PatientDashboard';
+import PatientAppointments from './screens/PatientAppointments';
+import PatientNotifications from './screens/PatientNotifications';
 import DentistPanel from './screens/DentistPanel';
 import Chatbot from './screens/Chatbot';
 import DentistProfile from './screens/DentistProfile';
 import ConfirmarCita from './screens/ConfirmarCita';
 import SettingsModal from './components/SettingsModal';
+import PatientBottomNav from './components/PatientBottomNav';
+import type { Screen } from './types';
+
+const PATIENT_SCREENS = new Set<Screen>([
+  'patientDashboard',
+  'misCitas',
+  'notificaciones',
+  'marketplace',
+  'checkout',
+  'confirmarCita',
+  'chatbot',
+  'dentistProfile',
+]);
 
 function AppContent() {
   const { screen } = useApp();
+  const isPatientScreen = PATIENT_SCREENS.has(screen);
 
   return (
     <div className="min-h-screen bg-slatey-100">
@@ -32,6 +48,8 @@ function AppContent() {
             {screen === 'marketplace' && <Marketplace />}
             {screen === 'checkout' && <Checkout />}
             {screen === 'patientDashboard' && <PatientDashboard />}
+            {screen === 'misCitas' && <PatientAppointments />}
+            {screen === 'notificaciones' && <PatientNotifications />}
             {screen === 'dentistPanel' && <DentistPanel />}
             {screen === 'chatbot' && <Chatbot />}
             {screen === 'dentistProfile' && <DentistProfile />}
@@ -40,6 +58,7 @@ function AppContent() {
         </AnimatePresence>
 
         <SettingsModal />
+        {isPatientScreen && <PatientBottomNav />}
       </div>
     </div>
   );

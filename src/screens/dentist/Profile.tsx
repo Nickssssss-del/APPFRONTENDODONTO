@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, User, Mail, Phone, BadgeCheck, CreditCard,
-  Clock, Plus, X, Check, Calendar, AlertTriangle, Eye,
+  Clock, Plus, X, Check, Calendar, AlertTriangle,
 } from 'lucide-react';
 import { Button, Input, Badge, Modal } from '@/components/ui';
-import { useApp } from '@/store';
+import { useApp, TREATMENTS } from '@/store';
 import { WEEK_SCHEDULE } from '@/lib/dentistData';
+import type { AgendaPatient, DayLabel } from '@/types';
 
 const DEFAULT_PHOTO = 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200';
 
@@ -28,6 +29,16 @@ const CLINIC_PHOTOS = [
 
 const DAYS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
 
+const DAY_OPTIONS: { label: string; value: DayLabel }[] = [
+  { label: 'Lunes', value: 'Lun' },
+  { label: 'Martes', value: 'Mar' },
+  { label: 'Miércoles', value: 'Mié' },
+  { label: 'Jueves', value: 'Jue' },
+  { label: 'Viernes', value: 'Vie' },
+  { label: 'Sábado', value: 'Sáb' },
+  { label: 'Domingo', value: 'Dom' },
+];
+
 const DEFAULT_SCHEDULE: Record<string, { active: boolean; start: string; end: string }> = {
   Lunes: { active: true, start: '09:00', end: '18:00' },
   Martes: { active: true, start: '09:00', end: '18:00' },
@@ -39,7 +50,7 @@ const DEFAULT_SCHEDULE: Record<string, { active: boolean; start: string; end: st
 };
 
 export default function Profile() {
-  const { dentistWorkSchedules, setDentistWorkSchedules } = useApp();
+  const { dentistWorkSchedules, setDentistWorkSchedules, getAvailableTimeSlots, dentistRescheduleAppointment, appointmentRequests } = useApp();
   const dentistId = '1'; // Dr. Carlos Mendoza is dentist 1
   const storeSchedule = dentistWorkSchedules[dentistId];
 
@@ -67,20 +78,52 @@ export default function Profile() {
   const [saved, setSaved] = useState(false);
 
   const [warningModalOpen, setWarningModalOpen] = useState(false);
-  const [warningDaysList, setWarningDaysList] = useState<{ day: string; count: number; patients: any[] }[]>([]);
+  const [warningDaysList, setWarningDaysList] = useState<{ day: string; count: number; patients: AgendaPatient[] }[]>([]);
+  const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const [selectedReschedulePatient, setSelectedReschedulePatient] = useState<AgendaPatient | null>(null);
+  const [rescheduledPatientIds, setRescheduledPatientIds] = useState<Set<string>>(new Set());
+  const [rescheduleDay, setRescheduleDay] = useState<DayLabel>('Lun');
+  const [rescheduleTime, setRescheduleTime] = useState<string>('');
+
+  const getTreatmentDuration = (treatmentName: string): number => {
+    const treatment = TREATMENTS.find((t) => t.name === treatmentName);
+    return treatment ? treatment.duration : 60;
+  };
+
+  const getDateStringForDay = (dayLabel: DayLabel): string => {
+    const daySchedule = WEEK_SCHEDULE.find((d) => d.dayLabel === dayLabel);
+    return daySchedule ? daySchedule.fullDate : dayLabel;
+  };
+
+   const handleRescheduleConfirm = () => {
+     if (selectedReschedulePatient) {
+       const matchingRequest = appointmentRequests.find(
+         (req) => req.patientDni === selectedReschedulePatient.dni
+       );
+       if (matchingRequest) {
+         dentistRescheduleAppointment(matchingRequest.id, rescheduleDay, getDateStringForDay(rescheduleDay), rescheduleTime);
+       }
+       setRescheduledPatientIds((prev) => new Set([...prev, selectedReschedulePatient.id]));
+     }
+     setRescheduleModalOpen(false);
+     setSelectedReschedulePatient(null);
+   };
 
   const checkScheduleWarnings = (newSchedule: typeof schedule) => {
-    const warningDays: { day: string; count: number; patients: any[] }[] = [];
+    const warningDays: { day: string; count: number; patients: AgendaPatient[] }[] = [];
     Object.entries(newSchedule).forEach(([dayName, config]) => {
       if (!config.active) {
         const shortLabel = DAY_SHORT_MAP[dayName];
         const daySched = WEEK_SCHEDULE.find(s => s.dayLabel === shortLabel);
-        if (daySched && daySched.patients.length > 0) {
-          warningDays.push({
-            day: dayName,
-            count: daySched.patients.length,
-            patients: daySched.patients
-          });
+        if (daySched) {
+          const pendingPatients = daySched.patients.filter((pat) => !rescheduledPatientIds.has(pat.id));
+          if (pendingPatients.length > 0) {
+            warningDays.push({
+              day: dayName,
+              count: pendingPatients.length,
+              patients: pendingPatients
+            });
+          }
         }
       }
     });
@@ -323,40 +366,128 @@ export default function Profile() {
             </div>
           </div>
 
-          <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-            {warningDaysList.map((wd) => (
-              <div key={wd.day} className="p-3 rounded-xl bg-slatey-50 border border-slatey-100 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-slatey-900">{wd.day}</span>
-                  <Badge variant="error" size="sm">
-                    {wd.count} {wd.count === 1 ? 'cita agendada' : 'citas agendadas'}
-                  </Badge>
-                </div>
-                <div className="space-y-1.5 pl-1">
-                  {wd.patients.map((pat) => (
-                    <div key={pat.id} className="flex items-center justify-between text-xs text-slatey-600 bg-white p-2 rounded-lg border border-slatey-100">
-                      <div>
-                        <p className="font-semibold text-slatey-800">{pat.name}</p>
-                        <p className="text-[10px] text-slatey-400">{pat.treatment}</p>
-                      </div>
-                      <span className="font-bold text-slatey-700">{pat.time}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+           <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+             {warningDaysList.map((wd) => {
+               const visiblePatients = wd.patients.filter((pat) => !rescheduledPatientIds.has(pat.id));
+               if (visiblePatients.length === 0) return null;
+               return (
+                 <div key={wd.day} className="p-3 rounded-xl bg-slatey-50 border border-slatey-100 space-y-2">
+                   <div className="flex justify-between items-center">
+                     <span className="text-sm font-bold text-slatey-900">{wd.day}</span>
+                     <Badge variant="error" size="sm">
+                       {visiblePatients.length} {visiblePatients.length === 1 ? 'cita agendada' : 'citas agendadas'}
+                     </Badge>
+                   </div>
+                   <div className="space-y-1.5 pl-1">
+                     {visiblePatients.map((pat) => (
+                       <div key={pat.id} className="flex items-center justify-between text-xs text-slatey-600 bg-white p-2 rounded-lg border border-slatey-100">
+                         <div>
+                           <p className="font-semibold text-slatey-800">{pat.name}</p>
+                           <p className="text-[10px] text-slatey-400">{pat.treatment}</p>
+                         </div>
+                         <div className="flex items-center gap-2">
+                           <span className="font-bold text-slatey-700">{pat.time}</span>
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => {
+                               setSelectedReschedulePatient(pat);
+                               setRescheduleDay('Lun');
+                               setRescheduleTime('');
+                               setRescheduleModalOpen(true);
+                             }}
+                           >
+                             Reprogramar
+                           </Button>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                 </div>
+               );
+             })}
+           </div>
 
-          <div className="flex gap-3">
-            <Button variant="outline" fullWidth onClick={() => setWarningModalOpen(false)}>
-              Cancelar
-            </Button>
-            <Button variant="primary" fullWidth onClick={handleConfirmSaveWithWarnings}>
-              Guardar de todas formas
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </div>
-  );
+           <div className="flex gap-3">
+             <Button variant="outline" fullWidth onClick={() => setWarningModalOpen(false)}>
+               Cancelar
+             </Button>
+             <Button variant="primary" fullWidth onClick={handleConfirmSaveWithWarnings}>
+               Guardar de todas formas
+             </Button>
+           </div>
+         </div>
+       </Modal>
+
+       {/* Reschedule Modal */}
+       <Modal
+         open={rescheduleModalOpen && !!selectedReschedulePatient}
+         onClose={() => setRescheduleModalOpen(false)}
+         title="Reprogramar cita"
+       >
+         {selectedReschedulePatient && (
+           <div className="space-y-4">
+             <div className="flex items-center gap-3 p-3 rounded-xl bg-slatey-50 border border-slatey-100">
+               <img src={selectedReschedulePatient.photo} alt={selectedReschedulePatient.name} className="w-10 h-10 rounded-lg object-cover" />
+               <div>
+                 <p className="text-sm font-bold text-slatey-900">{selectedReschedulePatient.name}</p>
+                 <p className="text-xs text-slatey-500">{selectedReschedulePatient.treatment} • {selectedReschedulePatient.time}</p>
+               </div>
+             </div>
+
+             <div>
+               <label className="block text-sm font-semibold text-slatey-700 mb-2">Seleccionar día</label>
+               <select
+                 value={rescheduleDay}
+                 onChange={(e) => setRescheduleDay(e.target.value as DayLabel)}
+                 className="w-full px-4 py-3 rounded-2xl border-2 border-slatey-200 bg-slatey-50 text-slatey-900 focus:border-primary-400 focus:outline-none text-sm font-medium"
+               >
+                 {DAY_OPTIONS.map((opt) => (
+                   <option key={opt.value} value={opt.value}>{opt.label}</option>
+                 ))}
+               </select>
+             </div>
+
+             {getAvailableTimeSlots(dentistId, rescheduleDay, getTreatmentDuration(selectedReschedulePatient.treatment)).length === 0 ? (
+               <p className="text-sm text-slatey-500">No hay horarios disponibles para este día.</p>
+             ) : (
+               <div>
+                 <label className="block text-sm font-semibold text-slatey-700 mb-2">Seleccionar hora</label>
+                 <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
+                   {getAvailableTimeSlots(dentistId, rescheduleDay, getTreatmentDuration(selectedReschedulePatient.treatment))
+                     .filter((slot) => slot !== selectedReschedulePatient.time)
+                     .map((slot) => (
+                       <button
+                         key={slot}
+                         onClick={() => setRescheduleTime(slot)}
+                         className={`py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                           rescheduleTime === slot
+                             ? 'bg-primary-500 text-white shadow-md'
+                             : 'bg-white border border-slatey-200 text-slatey-700 hover:border-primary-300 hover:bg-primary-50'
+                         }`}
+                       >
+                         {slot}
+                       </button>
+                     ))}
+                 </div>
+               </div>
+             )}
+
+             <div className="flex gap-3">
+               <Button variant="outline" fullWidth onClick={() => setRescheduleModalOpen(false)}>
+                 Cancelar
+               </Button>
+               <Button
+                 fullWidth
+                 disabled={!rescheduleTime}
+                 onClick={handleRescheduleConfirm}
+               >
+                 Confirmar reprogramación
+               </Button>
+             </div>
+           </div>
+         )}
+       </Modal>
+     </div>
+   );
 }

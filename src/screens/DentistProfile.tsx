@@ -11,7 +11,7 @@ import { Button, Badge } from '@/components/ui';
 import type { DentistProfile } from '@/types';
 
 export default function DentistProfile() {
-  const { setScreen, selectedDentistId, agendaLocked } = useApp();
+  const { setScreen, selectedDentistId, agendaLocked, user, setSettingsOpen } = useApp();
   
   // Mock dentist profile data - in a real app this would come from an API
   const dentistProfiles: Record<string, DentistProfile> = {
@@ -126,7 +126,7 @@ export default function DentistProfile() {
   const dentist = selectedDentistId ? getDentistProfile(selectedDentistId) : null;
 
   return (
-    <div className="min-h-screen bg-slatey-50">
+    <div className="min-h-screen bg-slatey-50 pb-24">
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">

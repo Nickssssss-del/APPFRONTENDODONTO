@@ -60,7 +60,7 @@ export default function Chatbot() {
   };
 
   return (
-    <div className="min-h-screen bg-slatey-50 flex flex-col">
+    <div className="min-h-screen bg-slatey-50 flex flex-col pb-24">
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
@@ -159,7 +159,7 @@ export default function Chatbot() {
       )}
 
       {/* Input */}
-      <div className="sticky bottom-0 bg-white border-t border-slatey-100 px-4 py-3">
+      <div className="sticky bottom-24 bg-white border-t border-slatey-100 px-4 py-3">
         <div className="flex items-center gap-2 max-w-md mx-auto">
           <input
             type="text"

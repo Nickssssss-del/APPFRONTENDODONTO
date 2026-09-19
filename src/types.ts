@@ -6,6 +6,8 @@ export type Screen =
   | 'marketplace'
   | 'checkout'
   | 'patientDashboard'
+  | 'misCitas'
+  | 'notificaciones'
   | 'dentistPanel'
   | 'chatbot'
   | 'dentistProfile'
@@ -62,6 +64,7 @@ export type AppointmentRequest = {
   selectedTime: string;
   status: AppointmentRequestStatus;
   createdAt: number;
+  rescheduledBy?: 'dentist';
 };
 
 export type UserProfile = {

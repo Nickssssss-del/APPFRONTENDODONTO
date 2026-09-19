@@ -159,7 +159,7 @@ const [dniError, setDniError] = useState(false);
 
   if (!selectedDentistId) {
     return (
-      <div className="min-h-screen bg-slatey-50">
+      <div className="min-h-screen bg-slatey-50 pb-24">
         {/* Header */}
         <div className="sticky top-0 z-30 glass border-b border-slatey-100">
           <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
@@ -223,7 +223,7 @@ const [dniError, setDniError] = useState(false);
   }
 
 return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50 pb-24">
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
       {/* Cover */}
       <div className="relative h-44 overflow-hidden">
@@ -326,7 +326,7 @@ return (
       </div>
 
       {/* Booking Sheet */}
-      <div className="shrink-0 flex flex-col max-h-[55vh] bg-white rounded-t-3xl shadow-2xl shadow-slatey-900/10 border-t border-slatey-100 overflow-hidden">
+      <div className="shrink-0 mb-24 flex flex-col max-h-[55vh] bg-white rounded-t-3xl shadow-2xl shadow-slatey-900/10 border-t border-slatey-100 overflow-hidden">
           <div className="flex-shrink-0 flex justify-center pt-3 pb-1">
             <div className="w-10 h-1.5 rounded-full bg-slatey-200" aria-hidden="true" />
           </div>

@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, type ReactNode } from '
 import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, SessionInfo, AppointmentRequest, DayLabel } from './types';
 import { supabase } from './lib/supabase';
 
-type AppState = {
+export type AppState = {
   role: Role;
   setRole: (r: Role) => void;
   screen: Screen;
@@ -54,6 +54,7 @@ type AppState = {
   approveAppointmentRequest: (id: string) => void;
   requestAppointmentReschedule: (id: string) => void;
   rescheduleAppointmentRequest: (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => void;
+  dentistRescheduleAppointment: (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => void;
   reschedulingRequestId: string | null;
   setReschedulingRequestId: (id: string | null) => void;
   reservedSlots: Record<string, string[]>;
@@ -265,6 +266,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setReschedulingRequestId(null);
   };
 
+  const dentistRescheduleAppointment = (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => {
+    const request = appointmentRequests.find((item) => item.id === id);
+    if (!request) return;
+    releaseSlot(request.dentistId, request.dayLabel, request.selectedTime);
+    reserveSlot(request.dentistId, dayLabel, selectedTime);
+    setAppointmentRequests((current) => current.map((item) => (
+      item.id === id
+        ? { ...item, dayLabel, selectedDay, selectedTime, status: 'CONFIRMED', rescheduledBy: 'dentist', createdAt: Date.now() }
+        : item
+    )));
+  };
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -356,6 +369,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         approveAppointmentRequest,
         requestAppointmentReschedule,
         rescheduleAppointmentRequest,
+        dentistRescheduleAppointment,
         reschedulingRequestId,
         setReschedulingRequestId,
         reservedSlots, setReservedSlots,

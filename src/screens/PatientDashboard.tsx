@@ -285,10 +285,18 @@ export default function PatientDashboard() {
               {(!activeRequest || activeRequest.status === 'CONFIRMED') && <CheckCircle2 className="w-3.5 h-3.5" />}
               {!activeRequest ? 'Confirmada' : activeRequest.status === 'PENDING_APPROVAL' ? 'Pendiente de aprobación' : activeRequest.status === 'RESCHEDULE_REQUESTED' ? 'Reprogramación solicitada' : 'Confirmada'}
             </Badge>
-          </div>
-          {activeRequest?.status === 'PENDING_APPROVAL' && (
-            <p className="text-xs text-primary-100 mb-3">El odontólogo debe revisar y confirmar tu solicitud antes de que la cita quede reservada.</p>
-          )}
+           </div>
+           {activeRequest?.status === 'CONFIRMED' && activeRequest?.rescheduledBy === 'dentist' && (
+             <div className="mb-3 rounded-xl bg-white/15 p-3 flex items-start gap-2">
+               <Calendar className="w-4 h-4 text-primary-200 flex-shrink-0 mt-0.5" />
+               <p className="text-xs text-primary-100 leading-relaxed">
+                 Tu cita fue reprogramida por el odontólogo.
+               </p>
+             </div>
+           )}
+           {activeRequest?.status === 'PENDING_APPROVAL' && (
+             <p className="text-xs text-primary-100 mb-3">El odontólogo debe revisar y confirmar tu solicitud antes de que la cita quede reservada.</p>
+           )}
           {activeRequest?.status === 'RESCHEDULE_REQUESTED' && (
             <div className="mb-3 rounded-xl bg-white/15 p-3">
               <p className="text-xs text-primary-100 mb-2">El odontólogo solicitó elegir otro horario entre los bloques disponibles.</p>
@@ -431,7 +439,7 @@ export default function PatientDashboard() {
       {/* FAB */}
       <button
         onClick={() => setScreen('chatbot')}
-        className="fixed bottom-6 right-4 z-30 w-14 h-14 rounded-full bg-primary-500 shadow-xl shadow-primary-500/30 flex items-center justify-center hover:scale-105 transition-transform"
+        className="fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full bg-primary-500 shadow-xl shadow-primary-500/30 flex items-center justify-center hover:scale-105 transition-transform"
       >
         <MessageCircle className="w-6 h-6 text-white" />
         <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-error-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
