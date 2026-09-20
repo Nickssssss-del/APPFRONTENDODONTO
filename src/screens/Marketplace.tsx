@@ -326,7 +326,7 @@ return (
       </div>
 
       {/* Booking Sheet */}
-      <div className="shrink-0 mb-24 flex flex-col max-h-[55vh] bg-white rounded-t-3xl shadow-2xl shadow-slatey-900/10 border-t border-slatey-100 overflow-hidden">
+      <div className="shrink-0 flex flex-col max-h-[42vh] bg-white rounded-t-3xl shadow-2xl shadow-slatey-900/10 border-t border-slatey-100 overflow-hidden">
           <div className="flex-shrink-0 flex justify-center pt-3 pb-1">
             <div className="w-10 h-1.5 rounded-full bg-slatey-200" aria-hidden="true" />
           </div>

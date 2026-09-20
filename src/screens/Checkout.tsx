@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowLeft, CheckCircle2, FileText, ShieldCheck, Upload, CreditCard,
-  Calendar, Clock, AlertCircle, Check, XCircle, Loader2, PartyPopper,
+  Calendar, Clock, AlertCircle, Check, XCircle,
 } from 'lucide-react';
 import { useApp, formatTime, DAY_LABELS } from '../store';
 import { Button, Badge, Modal } from '../components/ui';
@@ -65,7 +65,8 @@ export default function Checkout() {
   ];
 
   return (
-    <div className="min-h-screen bg-slatey-50 pb-24">
+    <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50 pb-24">
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
@@ -321,8 +322,9 @@ export default function Checkout() {
           </Button>
         </div>
       </div>
+    </div>
 
-      {/* Success Modal with celebration animation */}
+    {/* Success Modal with celebration animation */}
       <Modal open={showSuccess} onClose={handleSuccessClose} className="!sm:max-w-sm">
         <div className="flex flex-col items-center text-center pt-2 relative overflow-hidden">
           {/* Confetti particles */}
