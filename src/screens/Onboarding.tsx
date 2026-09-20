@@ -116,11 +116,11 @@ export default function Onboarding() {
         dni: dniKey || '12345678',
         age: profileData.age,
       });
-      setIsAuth(true);
-      resetPatientNavigationState();
-      setScreen(role === 'patient' ? 'marketplace' : 'dentistPanel');
-      if (role === 'dentist') setShowWelcomeBanner(true);
-      setStep('success');
+setIsAuth(true);
+       resetPatientNavigationState();
+       setScreen(role === 'patient' ? 'patientDashboard' : 'dentistPanel');
+       if (role === 'dentist') setShowWelcomeBanner(true);
+       setStep('success');
     } catch {
       setErrorMsg('Credenciales incorrectas. Verifica tu correo y contraseña.');
       setStep('error');
@@ -190,9 +190,9 @@ export default function Onboarding() {
     }, 1500);
   };
 
-  const handleEnter = () => {
-    setScreen(role === 'patient' ? 'marketplace' : 'dentistPanel');
-  };
+const handleEnter = () => {
+     setScreen(role === 'patient' ? 'patientDashboard' : 'dentistPanel');
+   };
 
   const otpComplete = otp.every((d) => d !== '');
 
