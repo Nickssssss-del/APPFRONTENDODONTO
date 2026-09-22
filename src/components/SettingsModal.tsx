@@ -2,10 +2,29 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Phone, Fingerprint, FileText, Calendar, Clock, Building2,
-  ShieldCheck, ChevronRight, ArrowLeft, Loader2, CheckCircle2
+  ShieldCheck, ChevronRight, ArrowLeft, Loader2, CheckCircle2,
+  RotateCcw, Bug
 } from 'lucide-react';
 import { useApp } from '../store';
 import { Modal, Button, Badge, Input, Toggle } from './ui';
+
+function DebugResetTour() {
+  const resetTour = () => {
+    localStorage.removeItem('tour_paciente_visto');
+    localStorage.removeItem('tour_doctor_visto');
+    console.log('✅ Tour flags reset. Refresh to see tour again.');
+  };
+
+  return (
+    <div className="pt-4 border-t border-slatey-100">
+      <p className="text-xs text-slatey-400 text-center mb-3 uppercase tracking-wide">Debug</p>
+      <Button variant="outline" fullWidth onClick={resetTour} className="bg-error-50 border-error-200 text-error-600 hover:bg-error-100">
+        <Bug className="w-4 h-4 mr-2" />
+        Resetear tour (paciente + doctor)
+      </Button>
+    </div>
+  );
+}
 
 export default function SettingsModal() {
   const {
@@ -193,6 +212,8 @@ export default function SettingsModal() {
                 Cerrar
               </Button>
             </div>
+
+            <DebugResetTour />
           </motion.div>
         ) : (
           <motion.div

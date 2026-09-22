@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings, LayoutDashboard, Calendar, Users, FileText,
+  Settings, LayoutDashboard, Calendar, Users, FileText, Bot,
 } from 'lucide-react';
 import { useApp } from '@/store';
 import type { DentistTab } from '@/types';
@@ -42,9 +42,21 @@ export default function DentistPanel() {
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
                 <span className="text-xs text-success-600 font-semibold">Sesión activa</span>
-              </div>
-            </div>
-          </div>
+</div>
+         </div>
+       )
+       {/* FAB for Chatbot */}
+       <button
+         onClick={() => setScreen('chatbot')}
+         className="fixed bottom-6 right-4 z-30 w-14 h-14 rounded-full bg-primary-500 shadow-xl shadow-primary-500/30 flex items-center justify-center hover:scale-105 transition-transform"
+         data-testid="dentist-chatbot-fab"
+       >
+         <Bot className="w-6 h-6 text-white" />
+         <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-error-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
+           1
+         </span>
+       </button>
+     </div>
           <button
             onClick={() => setSettingsOpen(true)}
             className="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors"

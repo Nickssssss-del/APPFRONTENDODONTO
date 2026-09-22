@@ -142,16 +142,18 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
       )}
 
       {/* Lock Agenda Button */}
-      <motion.button
-        initial={{ opacity: 0, y: 5 }}
-        animate={{ opacity: 1, y: 0 }}
-        onClick={() => setAgendaLocked(!agendaLocked)}
-        className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-sm transition-all ${
-          agendaLocked
-            ? 'bg-error-500 text-white hover:bg-error-600 shadow-md shadow-error-500/20'
-            : 'bg-slatey-800 text-white hover:bg-slatey-900 shadow-md shadow-slatey-900/10'
-        }`}
-      >
+<motion.button
+          id="dentist-lock-agenda-button"
+          data-testid="dentist-lock-agenda-button"
+         initial={{ opacity: 0, y: 5 }}
+         animate={{ opacity: 1, y: 0 }}
+         onClick={() => setAgendaLocked(!agendaLocked)}
+         className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-sm transition-all ${
+           agendaLocked
+             ? 'bg-error-500 text-white hover:bg-error-600 shadow-md shadow-error-500/20'
+             : 'bg-slatey-800 text-white hover:bg-slatey-900 shadow-md shadow-slatey-900/10'
+         }`}
+       >
         <AnimatePresence mode="wait">
           {agendaLocked ? (
             <motion.div key="locked" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} className="flex items-center gap-2">
@@ -166,10 +168,10 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
       </motion.button>
 
       {pendingRequests.length > 0 && (
-        <section className="space-y-3">
+        <section id="dentist-pending-requests" data-testid="dentist-pending-requests" className="space-y-3">
           <div className="flex items-center justify-between px-1">
             <h3 className="text-sm font-bold text-slatey-900">Solicitudes de cita pendientes</h3>
-            <Badge variant="warning" size="sm">{pendingRequests.length} nuevas</Badge>
+            <Badge variant="warning" size="sm" data-testid="dentist-pending-requests-badge">{pendingRequests.length} nuevas</Badge>
           </div>
           {pendingRequests.map((request) => (
             <div key={request.id} className="bg-white rounded-2xl border border-accent-200 p-4 space-y-3">

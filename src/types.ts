@@ -11,6 +11,7 @@ export type Screen =
   | 'dentistPanel'
   | 'chatbot'
   | 'dentistProfile'
+  | 'patientProfile'
   | 'confirmarCita';
 
 export type DayLabel = 'Lun' | 'Mar' | 'Mié' | 'Jue' | 'Vie' | 'Sáb' | 'Dom';
