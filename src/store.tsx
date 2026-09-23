@@ -63,6 +63,7 @@ export type AppState = {
   getAvailableTimeSlots: (dentistId: string, dayLabel: string, treatmentDuration: number) => string[];
   dentistWorkSchedules: Record<string, Record<string, { active: boolean; start: string; end: string }>>;
   setDentistWorkSchedules: (s: Record<string, Record<string, { active: boolean; start: string; end: string }>>) => void;
+  loginWithGoogle: (idToken: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -337,6 +338,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setHoldSeconds(600);
   };
 
+  const loginWithGoogle = async (idToken: string) => {
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      });
+      if (!res.ok) throw new Error('Google auth failed');
+      const data = await res.json();
+      // Expect backend to return { token: string, user: UserProfile, role: Role }
+      if (data.token) {
+        localStorage.setItem('jwt', data.token);
+      }
+      if (data.user) {
+        setUser(data.user);
+        setRole(data.role || 'patient');
+        setIsAuth(true);
+        // navigate after auth
+        setScreen(data.role === 'dentist' ? 'dentistPanel' : 'patientDashboard');
+        if (data.role === 'dentist') setShowWelcomeBanner(true);
+      }
+    } catch (e) {
+      console.error('Google login error', e);
+      throw e;
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -377,6 +405,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         getAvailableTimeSlots,
         dentistWorkSchedules,
         setDentistWorkSchedules,
+        loginWithGoogle,
       }}
     >
       {children}

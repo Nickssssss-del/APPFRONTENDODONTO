@@ -31,6 +31,7 @@ export default function Onboarding() {
     setSelectedDay,
     selectedTime,
     setSelectedTime,
+    loginWithGoogle,
   } = useApp();
 
   const resetPatientNavigationState = () => {
@@ -123,6 +124,27 @@ setIsAuth(true);
        setStep('success');
     } catch {
       setErrorMsg('Credenciales incorrectas. Verifica tu correo y contraseña.');
+      setStep('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    try {
+      // In a real app, use Google Identity Services to get an ID token.
+      // Here we simulate by prompting for a mock token.
+      const mockIdToken = prompt('Ingresa tu Google ID Token (simulado):');
+      if (!mockIdToken) {
+        setLoading(false);
+        return;
+      }
+      await loginWithGoogle(mockIdToken);
+      setStep('success');
+    } catch (e) {
+      setErrorMsg('No se pudo iniciar sesión con Google.');
       setStep('error');
     } finally {
       setLoading(false);
@@ -355,7 +377,7 @@ const handleEnter = () => {
                 </div>
 
                 <button
-                  onClick={handleLogin}
+                  onClick={handleGoogleLogin}
                   className="w-full flex items-center justify-center gap-3 py-3.5 rounded-2xl border-2 border-slatey-200 bg-white hover:bg-slatey-50 transition-colors"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">

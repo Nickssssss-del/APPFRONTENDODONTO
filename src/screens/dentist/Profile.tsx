@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, User, Mail, Phone, BadgeCheck, CreditCard,
   Clock, Plus, X, Check, Calendar, AlertTriangle,
+  FileText, Upload, Shield, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import { Button, Input, Badge, Modal } from '@/components/ui';
 import { useApp, TREATMENTS } from '@/store';
@@ -76,6 +77,10 @@ export default function Profile() {
   const [schedule, setSchedule] = useState<Record<string, { active: boolean; start: string; end: string }>>(initialSchedule);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  // Professional verification
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'observado' | 'rechazado'>('verified');
+  const [docFiles, setDocFiles] = useState<{ dni?: File; title?: File; cop?: File; cv?: File }>({});
 
   const [warningModalOpen, setWarningModalOpen] = useState(false);
   const [warningDaysList, setWarningDaysList] = useState<{ day: string; count: number; patients: AgendaPatient[] }[]>([]);
@@ -235,6 +240,72 @@ export default function Profile() {
             <span className={`text-xs font-semibold ${bio.length > 180 ? 'text-error-500' : 'text-slatey-400'}`}>{bio.length}/200</span>
           </div>
         </div>
+      </div>
+
+      {/* Professional Verification */}
+      <div className="bg-white rounded-2xl p-5 border border-slatey-100">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-primary-500" />
+            <h3 className="text-sm font-bold text-slatey-900">Verificación profesional (COP)</h3>
+          </div>
+          <Badge
+            variant={
+              verificationStatus === 'verified' ? 'success' :
+              verificationStatus === 'pending' ? 'warning' :
+              'error'
+            }
+            size="sm"
+          >
+            {verificationStatus === 'verified' && <CheckCircle2 className="w-3 h-3 mr-1" />}
+            {verificationStatus === 'pending' && <AlertCircle className="w-3 h-3 mr-1" />}
+            { (verificationStatus === 'observado' || verificationStatus === 'rechazado') && <AlertTriangle className="w-3 h-3 mr-1" />}
+            {verificationStatus === 'verified' ? 'Verificado' :
+             verificationStatus === 'pending' ? 'Pendiente' :
+             verificationStatus === 'observado' ? 'Observado' : 'Rechazado'}
+          </Badge>
+        </div>
+
+        {(verificationStatus === 'observado' || verificationStatus === 'rechazado') && (
+          <div className="space-y-3">
+            <p className="text-sm text-slatey-600">
+              Tu documentación fue <strong>{verificationStatus === 'observado' ? 'observada' : 'rechazada'}</strong> por el sistema.
+              Por favor vuelve a subir los documentos requeridos. No es necesario iniciar un nuevo trámite.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <DocUpload label="DNI (frente y dorso)" icon={<FileText className="w-5 h-5" />} file={docFiles.dni} onChange={(f) => setDocFiles(prev => ({ ...prev, dni: f }))} />
+              <DocUpload label="Título profesional" icon={<FileText className="w-5 h-5" />} file={docFiles.title} onChange={(f) => setDocFiles(prev => ({ ...prev, title: f }))} />
+              <DocUpload label="Colegiatura (COP)" icon={<BadgeCheck className="w-5 h-5" />} file={docFiles.cop} onChange={(f) => setDocFiles(prev => ({ ...prev, cop: f }))} />
+              <DocUpload label="Currículum Vitae (PDF)" icon={<FileText className="w-5 h-5" />} file={docFiles.cv} onChange={(f) => setDocFiles(prev => ({ ...prev, cv: f }))} />
+            </div>
+            <Button
+              fullWidth
+              variant="primary"
+              onClick={() => {
+                setVerificationStatus('pending');
+                setTimeout(() => setVerificationStatus('verified'), 1500);
+              }}
+              disabled={!docFiles.dni || !docFiles.title || !docFiles.cop || !docFiles.cv}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Reenviar documentos para verificación
+            </Button>
+          </div>
+        )}
+
+        {verificationStatus === 'verified' && (
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-success-50 border border-success-100">
+            <CheckCircle2 className="w-5 h-5 text-success-500 flex-shrink-0" />
+            <p className="text-xs text-success-800">Tu verificación está vigente. Todos los documentos aprobados.</p>
+          </div>
+        )}
+
+        {verificationStatus === 'pending' && (
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-warning-50 border border-warning-100">
+            <AlertCircle className="w-5 h-5 text-warning-500 flex-shrink-0" />
+            <p className="text-xs text-warning-800">Verificación en revisión. Te notificaremos cuando concluya.</p>
+          </div>
+        )}
       </div>
 
       {/* Clinic Gallery */}
@@ -488,6 +559,36 @@ export default function Profile() {
            </div>
          )}
        </Modal>
-     </div>
-   );
+</div>
+    );
+  }
+
+function DocUpload({ label, icon, file, onChange }: { label: string; icon: React.ReactNode; file?: File; onChange: (f: File) => void }) {
+  return (
+    <div className="flex flex-col gap-1.5 p-3 rounded-xl border-2 border-dashed border-slatey-200 hover:border-primary-300 transition-colors">
+      <div className="flex items-center gap-2 text-sm font-semibold text-slatey-700">
+        <span className="text-primary-500">{icon}</span>
+        {label}
+      </div>
+      <input
+        type="file"
+        accept="application/pdf,image/*"
+        onChange={(e) => e.target.files?.[0] && onChange(e.target.files[0])}
+        className="sr-only"
+        id={`upload-${label.replace(/\s+/g, '-')}`}
+      />
+      <label
+        htmlFor={`upload-${label.replace(/\s+/g, '-')}`}
+        className="flex items-center justify-center gap-2 py-2 rounded-lg bg-slatey-50 text-sm text-slatey-600 hover:bg-slatey-100 cursor-pointer transition-colors"
+      >
+        <Upload className="w-4 h-4" />
+        {file ? `Seleccionado: ${file.name}` : 'Seleccionar archivo'}
+      </label>
+      {file && (
+        <p className="text-[10px] text-success-600 flex items-center gap-1">
+          <Check className="w-3 h-3" /> Listo para enviar
+        </p>
+      )}
+    </div>
+  );
 }

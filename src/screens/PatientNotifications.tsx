@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Bell, CalendarCheck, CheckCircle2, Clock3, CreditCard, ShieldCheck,
-  ArrowRight, Check, Sparkles,
+  ArrowRight, Check, Sparkles, Mail, Smartphone, MessageCircle,
 } from 'lucide-react';
 import { useApp } from '@/store';
 import { Badge } from '@/components/ui';
 import type { Screen } from '@/types';
+
+type NotificationChannel = 'email' | 'push' | 'whatsapp';
 
 type NotificationKind = 'appointment' | 'confirmation' | 'schedule' | 'payment' | 'security';
 
@@ -19,6 +21,7 @@ type PatientNotification = {
   read: boolean;
   actionLabel?: string;
   actionScreen?: Screen;
+  channels: NotificationChannel[];
 };
 
 const MOCK_NOTIFICATIONS: PatientNotification[] = [
@@ -31,6 +34,7 @@ const MOCK_NOTIFICATIONS: PatientNotification[] = [
     read: false,
     actionLabel: 'Ver mis citas',
     actionScreen: 'misCitas',
+    channels: ['email', 'push', 'whatsapp'],
   },
   {
     id: 'notification-2',
@@ -41,6 +45,7 @@ const MOCK_NOTIFICATIONS: PatientNotification[] = [
     read: false,
     actionLabel: 'Ver detalles',
     actionScreen: 'misCitas',
+    channels: ['email', 'push'],
   },
   {
     id: 'notification-3',
@@ -51,6 +56,7 @@ const MOCK_NOTIFICATIONS: PatientNotification[] = [
     read: false,
     actionLabel: 'Revisar cita',
     actionScreen: 'misCitas',
+    channels: ['email', 'whatsapp'],
   },
   {
     id: 'notification-4',
@@ -61,6 +67,7 @@ const MOCK_NOTIFICATIONS: PatientNotification[] = [
     read: true,
     actionLabel: 'Ver comprobante',
     actionScreen: 'misCitas',
+    channels: ['email', 'push', 'whatsapp'],
   },
   {
     id: 'notification-5',
@@ -71,6 +78,7 @@ const MOCK_NOTIFICATIONS: PatientNotification[] = [
     read: true,
     actionLabel: 'Ir a Perfil',
     actionScreen: 'dentistProfile',
+    channels: ['push'],
   },
 ];
 
@@ -80,6 +88,12 @@ const notificationConfig: Record<NotificationKind, { icon: typeof Bell; classNam
   schedule: { icon: Clock3, className: 'bg-accent-50 text-accent-600', badge: 'accent' },
   payment: { icon: CreditCard, className: 'bg-primary-50 text-primary-600', badge: 'primary' },
   security: { icon: ShieldCheck, className: 'bg-success-50 text-success-600', badge: 'success' },
+};
+
+const channelConfig: Record<NotificationChannel, { icon: typeof Mail; label: string; color: string }> = {
+  email: { icon: Mail, label: 'Correo', color: 'bg-blue-50 text-blue-700' },
+  push: { icon: Smartphone, label: 'Push', color: 'bg-purple-50 text-purple-700' },
+  whatsapp: { icon: MessageCircle, label: 'WhatsApp', color: 'bg-green-50 text-green-700' },
 };
 
 export default function PatientNotifications() {
@@ -193,7 +207,21 @@ export default function PatientNotifications() {
                             <h3 className="text-sm font-bold text-slatey-900">{notification.title}</h3>
                             {!notification.read && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-primary-500" />}
                           </div>
-                          <p className="mt-1 text-xs leading-relaxed text-slatey-600">{notification.message}</p>
+<p className="mt-1 text-xs leading-relaxed text-slatey-600">{notification.message}</p>
+                          {notification.channels.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {notification.channels.map((ch) => {
+                                const cfg = channelConfig[ch];
+                                const ChIcon = cfg.icon;
+                                return (
+                                  <Badge key={ch} variant="neutral" size="sm" className={cfg.color}>
+                                    <ChIcon className="w-3 h-3 mr-1" />
+                                    {cfg.label}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          )}
                           <p className="mt-2 text-[11px] font-medium text-slatey-400">{notification.time}</p>
                         </div>
                         <Badge variant={config.badge} size="sm">

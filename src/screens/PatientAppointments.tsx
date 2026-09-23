@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   CalendarDays, Clock, MapPin, ShieldCheck, ChevronRight, Plus,
-  Stethoscope, CheckCircle2, AlertCircle, RotateCcw,
+  Stethoscope, CheckCircle2, AlertCircle, RotateCcw, XCircle,
 } from 'lucide-react';
 import { useApp } from '@/store';
 import { Badge, Button } from '@/components/ui';
@@ -23,6 +23,8 @@ type PatientAppointment = {
   status: PatientAppointmentStatus;
   guaranteePaid: boolean;
   period: 'upcoming' | 'past';
+  strikes: number; // 0-3
+  late?: boolean; // true if >15 min late
 };
 
 const DENTISTS: Record<string, Pick<PatientAppointment, 'dentistName' | 'specialty' | 'image' | 'address'>> = {
@@ -66,6 +68,7 @@ const MOCK_APPOINTMENTS: PatientAppointment[] = [
     status: 'CONFIRMED',
     guaranteePaid: true,
     period: 'upcoming',
+    strikes: 0,
   },
   {
     id: 'patient-upcoming-2',
@@ -80,6 +83,7 @@ const MOCK_APPOINTMENTS: PatientAppointment[] = [
     status: 'PENDING_APPROVAL',
     guaranteePaid: false,
     period: 'upcoming',
+    strikes: 0,
   },
   {
     id: 'patient-upcoming-3',
@@ -94,6 +98,8 @@ const MOCK_APPOINTMENTS: PatientAppointment[] = [
     status: 'RESCHEDULE_REQUESTED',
     guaranteePaid: true,
     period: 'upcoming',
+    strikes: 1,
+    late: true,
   },
   {
     id: 'patient-past-1',
@@ -108,6 +114,7 @@ const MOCK_APPOINTMENTS: PatientAppointment[] = [
     status: 'COMPLETED',
     guaranteePaid: true,
     period: 'past',
+    strikes: 0,
   },
   {
     id: 'patient-past-2',
@@ -122,6 +129,7 @@ const MOCK_APPOINTMENTS: PatientAppointment[] = [
     status: 'COMPLETED',
     guaranteePaid: true,
     period: 'past',
+    strikes: 0,
   },
   {
     id: 'patient-past-3',
@@ -136,6 +144,7 @@ const MOCK_APPOINTMENTS: PatientAppointment[] = [
     status: 'CANCELLED',
     guaranteePaid: false,
     period: 'past',
+    strikes: 2,
   },
 ];
 
@@ -151,6 +160,16 @@ function AppointmentCard({ appointment }: { appointment: PatientAppointment }) {
   const { setSelectedDentistId, setScreen } = useApp();
   const status = statusConfig[appointment.status];
   const StatusIcon = status.icon;
+
+  // Simple 12h rule: allow free cancel/reschedule for upcoming appointments (mock)
+  const canModifyFree = appointment.period === 'upcoming' && appointment.status !== 'CANCELLED';
+
+  const strikeDots = Array.from({ length: 3 }, (_, i) => (
+    <span
+      key={i}
+      className={`w-2 h-2 rounded-full border border-slatey-300 ${i < appointment.strikes ? 'bg-error-500 border-error-500' : 'bg-transparent'}`}
+    />
+  ));
 
   return (
     <motion.div
@@ -185,6 +204,13 @@ function AppointmentCard({ appointment }: { appointment: PatientAppointment }) {
                 <ShieldCheck className="h-3 w-3" /> Garantía S/ 20
               </Badge>
             )}
+            {(appointment.strikes > 0 || appointment.late) && (
+              <Badge variant="error" size="sm" className="flex items-center gap-1">
+                <XCircle className="h-3 w-3" />
+                {appointment.late ? 'Tardanza >15m' : 'Inasistencia'}
+                <span className="flex gap-0.5 ml-1">{strikeDots}</span>
+              </Badge>
+            )}
           </div>
         </div>
       </div>
@@ -213,6 +239,16 @@ function AppointmentCard({ appointment }: { appointment: PatientAppointment }) {
             >
               <Stethoscope className="h-4 w-4" /> Ayuda con la cita
             </Button>
+          )}
+          {canModifyFree && appointment.status !== 'CANCELLED' && (
+            <>
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => alert('Cancelar cita (sin penalización >12h)')}>
+                Cancelar
+              </Button>
+              <Button variant="primary" size="sm" className="flex-1" onClick={() => alert('Reprogramar cita (sin penalización >12h)')}>
+                Reprogramar
+              </Button>
+            </>
           )}
         </div>
       </div>
