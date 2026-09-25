@@ -9,6 +9,7 @@ import { useApp } from '@/store';
 import { Badge } from '@/components/ui';
 import type { AgendaPatient, AppointmentStatus } from '@/types';
 import { getPatientsByDay, getPatientById, WEEK_SCHEDULE } from '@/lib/dentistData';
+import { supabase } from '@/lib/supabase';
 
 const TREATMENT_PRICES: Record<string, number> = {
   'Limpieza Dental Profunda': 80,
@@ -86,18 +87,46 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
   const dailyIncome = calculateDailyIncome();
   const maxIncome = Math.max(...dailyIncome.map((d) => d.income), 1);
   const weekTotal = dailyIncome.reduce((s, d) => s + d.income, 0);
-  const monthPatients = 48;
-  const occupancyRate = 78;
-  const monthStrikes = 2;
-  const pendingRequests = appointmentRequests.filter((request) => request.status === 'PENDING_APPROVAL');
+const monthPatients = 48;
+   const occupancyRate = 78;
+   // Calculate total strikes for unique patients in the week
+   let weekStrikes = 0;
+   const patientIds = new Set();
+   WEEK_SCHEDULE.forEach((day, index) => {
+     const patients = getPatientsByDay(index);
+     patients.forEach(p => {
+       if (!patientIds.has(p.id)) {
+         patientIds.add(p.id);
+         weekStrikes += p.strikes;
+       }
+     });
+   });
+   const pendingRequests = appointmentRequests.filter((request) => request.status === 'PENDING_APPROVAL');
 
-  const handleMark = (result: 'completed' | 'no_show') => {
-    setMarking(true);
-    setTimeout(() => {
-      setMarking(false);
-      setMarkResult(result);
-    }, 1000);
-  };
+   const handleMark = async (result: 'completed' | 'no_show') => {
+     setMarking(true);
+     if (result === 'no_show' && nextPatient) {
+       try {
+         // Update appointment status to NO_SHOW in Supabase
+         await supabase
+           .from('appointments')
+           .update({ status: 'NO_SHOW' })
+           .eq('id', nextPatient.id);
+         
+         // Apply strike via edge function or trigger (placeholder)
+         // await supabase.functions.invoke('apply-attendance-strike', {
+         //   body: { patientId: nextPatient.id }
+         // });
+         // For now, we rely on database triggers or refresh data on next fetch
+       } catch (error) {
+         console.error('Failed to mark no_show:', error);
+       }
+     }
+     setTimeout(() => {
+       setMarking(false);
+       setMarkResult(result);
+     }, 1000);
+   };
 
   return (
     <div className="space-y-5">
@@ -353,7 +382,7 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
           { icon: DollarSign, label: 'Ingresos de la semana', value: `S/ ${weekTotal.toLocaleString()}`, sub: 'Calculado de citas pagadas', color: 'primary' as const },
           { icon: Users, label: 'Pacientes atendidos', value: String(monthPatients), sub: '48 este mes', color: 'success' as const },
           { icon: TrendingUp, label: 'Tasa de ocupación', value: `${occupancyRate}%`, sub: '+5% vs mes anterior', color: 'accent' as const },
-          { icon: AlertTriangle, label: 'Strikes registrados', value: String(monthStrikes), sub: '2 este mes', color: 'error' as const },
+          { icon: AlertTriangle, label: 'Strikes registrados', value: String(weekStrikes), sub: `${weekStrikes} esta semana`, color: 'error' as const },
         ].map((stat, i) => {
           const Icon = stat.icon;
           return (

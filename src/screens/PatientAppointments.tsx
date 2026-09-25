@@ -219,33 +219,33 @@ function AppointmentCard({ appointment }: { appointment: PatientAppointment }) {
           <MapPin className="h-3.5 w-3.5 text-slatey-400" />
           <span className="truncate">{appointment.address}</span>
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="flex-1"
+            className="w-full text-xs font-semibold px-2 py-2.5 rounded-xl"
             onClick={() => {
               setSelectedDentistId(appointment.dentistId);
               setScreen('dentistProfile');
             }}
           >
-            Ver odontólogo <ChevronRight className="h-4 w-4" />
+            Ver odontólogo <ChevronRight className="h-3.5 w-3.5" />
           </Button>
           {appointment.period === 'upcoming' && appointment.status !== 'CANCELLED' && (
             <Button
               size="sm"
-              className="flex-1"
+              className="w-full text-xs font-semibold px-2 py-2.5 rounded-xl"
               onClick={() => setScreen('chatbot')}
             >
-              <Stethoscope className="h-4 w-4" /> Ayuda con la cita
+              <Stethoscope className="h-3.5 w-3.5" /> Ayuda con la cita
             </Button>
           )}
           {canModifyFree && appointment.status !== 'CANCELLED' && (
             <>
-              <Button variant="outline" size="sm" className="flex-1" onClick={() => alert('Cancelar cita (sin penalización >12h)')}>
+              <Button variant="outline" size="sm" className="w-full text-xs font-semibold px-2 py-2.5 rounded-xl" onClick={() => alert('Cancelar cita (sin penalización >12h)')}>
                 Cancelar
               </Button>
-              <Button variant="primary" size="sm" className="flex-1" onClick={() => alert('Reprogramar cita (sin penalización >12h)')}>
+              <Button variant="primary" size="sm" className="w-full text-xs font-semibold px-2 py-2.5 rounded-xl" onClick={() => alert('Reprogramar cita (sin penalización >12h)')}>
                 Reprogramar
               </Button>
             </>

@@ -138,15 +138,11 @@ export default function Patients({ onGoToPatient }: PatientsProps) {
   );
 }
 
-function PatientRow({ patient, index, onClick, compact = false }: { patient: AgendaPatient & { strikes?: number; late?: boolean }; index: number; onClick: () => void; compact?: boolean }) {
+function PatientRow({ patient, index, onClick, compact = false }: { patient: AgendaPatient; index: number; onClick: () => void; compact?: boolean }) {
   const status = statusConfig[patient.status];
-  const strikeCount = patient.strikes ?? 0;
-  const strikeDots = Array.from({ length: 3 }, (_, i) => (
-    <span
-      key={i}
-      className={`w-1.5 h-1.5 rounded-full border border-slatey-300 ${i < strikeCount ? 'bg-error-500 border-error-500' : 'bg-transparent'}`}
-    />
-  ));
+  const strikeCount = patient.strikes;
+  const lateCount = patient.lateArrivals;
+  const isBlocked = patient.reputationStatus === 'BLOCKED_RISK';
 
   return (
     <motion.button
@@ -154,7 +150,7 @@ function PatientRow({ patient, index, onClick, compact = false }: { patient: Age
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.04 }}
       onClick={onClick}
-      className={`w-full flex items-center gap-3 ${compact ? 'p-2.5' : 'p-3'} rounded-xl bg-white border border-slatey-100 hover:border-primary-200 transition-colors text-left`}
+      className={`w-full flex items-center gap-3 ${compact ? 'p-2.5' : 'p-3'} rounded-xl ${isBlocked ? 'border-2 border-error-500' : 'border-white'} bg-white border border-slatey-100 hover:border-primary-200 transition-colors text-left`}
     >
       <img src={patient.photo} alt={patient.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
       <div className="flex-1 min-w-0">
@@ -166,12 +162,19 @@ function PatientRow({ patient, index, onClick, compact = false }: { patient: Age
           {!compact && <span className="text-xs font-semibold text-slatey-600">{patient.time}</span>}
           {!compact && <span className="text-xs text-slatey-400">·</span>}
           <span className="text-xs text-slatey-500 truncate">{patient.treatment}</span>
-          {(strikeCount > 0 || patient.late) && (
+          {(strikeCount > 0 || lateCount > 0) && (
             <span className="flex items-center gap-1 ml-2">
               <Badge variant="error" size="sm" className="flex items-center gap-1">
                 <XCircle className="h-2.5 w-2.5" />
-                {patient.late ? 'Tardanza >15m' : 'Inasistencia'}
-                <span className="flex gap-0.5 ml-1">{strikeDots}</span>
+                {lateCount > 0 ? `Tardanzas: ${lateCount}` : `Inasistencias: ${strikeCount}`}
+                <span className="flex gap-0.5 ml-1">
+                  {Array.from({ length: 3 }, (_, i) => (
+                    <span
+                      key={i}
+                      className={`w-1 h-1 rounded-full border border-slatey-300 ${i < strikeCount ? 'bg-error-500 border-error-500' : 'bg-transparent'}`}
+                    />
+                  ))}
+                </span>
               </Badge>
             </span>
           )}
@@ -192,7 +195,14 @@ function PatientRow({ patient, index, onClick, compact = false }: { patient: Age
         >
           <MessageCircle className="w-4 h-4 text-success-600" />
         </a>
-        <Badge variant={status.variant} size="sm">{status.label}</Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant={status.variant} size="sm">{status.label}</Badge>
+          {isBlocked && (
+            <Badge variant="error" size="sm" className="ml-2">
+              Riesgo alto
+            </Badge>
+          )}
+        </div>
         <ChevronRight className="w-4 h-4 text-slatey-300" />
       </div>
     </motion.button>

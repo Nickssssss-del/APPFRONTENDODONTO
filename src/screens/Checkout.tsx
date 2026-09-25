@@ -403,7 +403,7 @@ export default function Checkout() {
         </div>
       </div>
 
-      <Modal open={showSuccess} onClose={handleSuccessClose} className="!sm:max-w-sm">
+      <Modal open={showSuccess} onClose={handleSuccessClose} className="sm:!max-w-sm">
         <div className="flex flex-col items-center text-center pt-2 relative overflow-hidden">
           {showSuccess && (
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
