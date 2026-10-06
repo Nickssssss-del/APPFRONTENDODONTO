@@ -50,6 +50,6 @@ input[type="checkbox"], input[type="radio"] {
 }
 
 ::selection {
-  background-color: #0D9488;
+  background-color: #0E9488;
   color: white;
 }

@@ -40,9 +40,13 @@ export default function Onboarding() {
       <div className="max-w-md mx-auto w-full space-y-6">
         {/* Header App Brand */}
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-primary-500 flex items-center justify-center shadow-lg shadow-primary-500/20">
-            <Shield className="w-7 h-7 text-white" />
-          </div>
+          <motion.div
+            animate={{ y: [0, -3, 0], rotate: [0, 2, 0] }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/20 overflow-hidden"
+          >
+            <img src="/System_(1).png" alt="OdontoSystem" className="w-11 h-11 object-contain" />
+          </motion.div>
           <div>
             <h1 className="text-xl font-black text-slatey-900 font-display leading-tight">OdontoSystem</h1>
             <p className="text-xs text-slatey-500 font-medium">Tu sonrisa, en buenas manos</p>

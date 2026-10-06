@@ -39,12 +39,13 @@ export default function WelcomeSplash({ onFinish }: WelcomeSplashProps) {
           transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
           className="absolute inset-0 rounded-full bg-success-200"
         />
-        <div className="relative w-28 h-28 rounded-full bg-gradient-to-br from-primary-500 to-success-500 flex items-center justify-center shadow-lg shadow-primary-500/30">
-          <svg className="w-14 h-14 text-white" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" opacity="0.25"/>
-            <path d="M12 6c-2 0-3 1-3 3 0 2 1 4 1 6 0 1 .5 2 2 2s2-1 2-2c0-2 1-4 1-6 0-2-1-3-3-3z"/>
-          </svg>
-        </div>
+        <motion.div
+          animate={{ y: [0, -6, 0] }}
+          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+          className="relative w-32 h-32 rounded-[2rem] bg-white flex items-center justify-center shadow-lg shadow-primary-500/25 overflow-visible"
+        >
+          <img src="/System_(1).png" alt="OdontoSystem" className="w-28 h-28 object-contain rounded-2xl" />
+        </motion.div>
         {/* Pequeño icono de verificación en la esquina */}
         <motion.div
           initial={{ scale: 0 }}

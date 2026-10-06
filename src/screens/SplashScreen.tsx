@@ -24,14 +24,23 @@ export default function SplashScreen() {
       >
         {/* Logo */}
         <motion.div
-          animate={{ rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-          className="w-20 h-20 rounded-3xl bg-white/15 flex items-center justify-center mx-auto mb-6"
+          initial={{ opacity: 0, scale: 0.82, rotate: -8 }}
+          animate={{ opacity: 1, scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 180, damping: 16 }}
+          className="relative w-32 h-32 rounded-[2rem] bg-white/95 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-primary-900/25"
         >
-          <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L3 7v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-9-5z" opacity="0.3"/>
-            <path d="M12 6c-2 0-3 1-3 3 0 2 1 4 1 6 0 1 .5 2 2 2s2-1 2-2c0-2 1-4 1-6 0-2-1-3-3-3z"/>
-          </svg>
+          <motion.div
+            animate={{ scale: [1, 1.08, 1], opacity: [0.22, 0, 0.22] }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -inset-3 rounded-[2.5rem] border border-success-300/60"
+          />
+          <motion.img
+            src="/System_(1).png"
+            alt="OdontoSystem"
+            animate={{ y: [0, -5, 0] }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="relative w-28 h-28 object-contain rounded-2xl"
+          />
         </motion.div>
 
         {/* App Name & Tagline */}
