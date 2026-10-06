@@ -45,7 +45,7 @@ export default function Onboarding() {
             transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}
             className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center shadow-lg shadow-primary-500/20 overflow-hidden"
           >
-            <img src="/System_(1).png" alt="OdontoSystem" className="w-11 h-11 object-contain" />
+            <img src="/System_(3).png" alt="OdontoSystem" className="w-11 h-11 object-contain" />
           </motion.div>
           <div>
             <h1 className="text-xl font-black text-slatey-900 font-display leading-tight">OdontoSystem</h1>

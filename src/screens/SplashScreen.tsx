@@ -35,7 +35,7 @@ export default function SplashScreen() {
             className="absolute -inset-3 rounded-[2.5rem] border border-success-300/60"
           />
           <motion.img
-            src="/System_(1).png"
+            src="/System_(3).png"
             alt="OdontoSystem"
             animate={{ y: [0, -5, 0] }}
             transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut' }}

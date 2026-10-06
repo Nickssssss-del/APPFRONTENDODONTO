@@ -44,7 +44,7 @@ export default function WelcomeSplash({ onFinish }: WelcomeSplashProps) {
           transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
           className="relative w-32 h-32 rounded-[2rem] bg-white flex items-center justify-center shadow-lg shadow-primary-500/25 overflow-visible"
         >
-          <img src="/System_(1).png" alt="OdontoSystem" className="w-28 h-28 object-contain rounded-2xl" />
+          <img src="/System_(3).png" alt="OdontoSystem" className="w-28 h-28 object-contain rounded-2xl" />
         </motion.div>
         {/* Pequeño icono de verificación en la esquina */}
         <motion.div
