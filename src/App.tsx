@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Component, ErrorInfo, ReactNode } from 'react';
 import { AppProvider, useApp } from './store';
 import SplashScreen from './screens/SplashScreen';
+import WelcomeTutorial from './screens/WelcomeTutorial';
 import Onboarding from './screens/Onboarding';
 import Marketplace from './screens/Marketplace';
 import Checkout from './screens/Checkout';
@@ -166,6 +167,7 @@ function AppContent() {
                 style={{ perspective: 1000 }}
               >
                 {screen === 'splash' && <SplashScreen />}
+                {screen === 'tutorial' && <WelcomeTutorial />}
                 {screen === 'onboarding' && <Onboarding />}
                 {screen === 'marketplace' && <Marketplace />}
                 {screen === 'checkout' && <Checkout />}

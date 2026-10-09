@@ -204,7 +204,7 @@ const [dniError, setDniError] = useState(false);
                   <span className="text-xs text-slatey-300">·</span>
                   <div className="flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-slatey-400" />
-                    <span className="text-xs text-slatey-500 truncate">{dentist.address.split(',')[1]?.trim() || dentist.address}</span>
+                    <span className="text-xs text-slatey-500 truncate">{dentist.district ?? dentist.address.split(',')[1]?.trim() ?? dentist.address}</span>
                   </div>
                 </div>
               </div>
