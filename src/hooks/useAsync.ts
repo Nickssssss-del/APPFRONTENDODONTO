@@ -7,7 +7,7 @@ type State<T> = { data: T | null; loading: boolean; error: string | null };
  * Carga datos del backend con los 3 estados que toda lista necesita (cargando / error / datos).
  * Cancela la petición si el componente se desmonta o cambian las dependencias.
  *
- *   const { data, loading, error, reload } = useAsync((signal) => listarServicios({ categoria }, signal), [categoria]);
+ *   const { data, loading, error, reload } = useAsync((signal) => buscarOdontologos({ distrito }, signal), [distrito]);
  */
 export function useAsync<T>(fn: (signal: AbortSignal) => Promise<T>, deps: unknown[] = []) {
   const [state, setState] = useState<State<T>>({ data: null, loading: true, error: null });

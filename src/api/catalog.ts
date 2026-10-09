@@ -2,85 +2,132 @@ import { api } from './http';
 import type { DentistLocation, ServiceItem } from '@/types';
 
 /**
- * ⚠ CONTRATO PENDIENTE EN EL BACKEND
- * Estos endpoints todavía NO existen en Spring Boot (hoy solo hay auth, archivos y chatbot).
- * Van bajo /api/public/** porque SecurityConfig ya lo deja abierto (permitAll): el paciente puede
- * explorar odontólogos y servicios antes de iniciar sesión. Ver el informe de integración para el detalle.
+ * Catálogo REAL del backend (rama feature/chatbot-recordatorios).
+ * Son públicos (sin sesión): GET /api/odontologos, /api/odontologos/{id}, /api/odontologos/{id}/disponibilidad
+ * y /api/catalogos/**. Las claves llegan en snake_case y http.ts las convierte a camelCase.
  */
 
-/* ── lo que el backend debe devolver (snake_case en el cable; aquí ya en camelCase) ── */
-export type OdontologoListItemDto = {
+/* ───────── tipos (espejo de OdontologoDtos.java / CitaDtos.java) ───────── */
+export type ItemCatalogo = { id: number; nombre: string };
+
+export type OdontologoTarjeta = {
   id: string;
-  nombreCompleto: string;
-  fotoPerfilUrl?: string | null;
-  nombreConsultorio?: string | null;
-  direccionConsultorio?: string | null;
-  distritoConsultorio?: string | null;
-  latitudConsultorio?: number | null;
-  longitudConsultorio?: number | null;
-  calificacionPromedio: number;
-  totalResenas: number;
-  numeroColegiatura: string;
-  colegiaturaVerificada: boolean;
+  nombre: string;
+  fotoUrl?: string | null;
+  consultorio?: string | null;
+  distrito?: string | null;
+  calificacion?: number | null;
+  totalResenas?: number | null;
   especialidades: string[];
-  /** Precio más bajo entre sus servicios activos. */
   precioDesde?: number | null;
+  /** Solo viene cuando buscas "cerca de mí" (lat/lng). */
+  distanciaKm?: number | null;
 };
 
-export type ServicioDto = {
+export type Pagina<T> = { contenido: T[]; pagina: number; tamano: number; totalElementos: number; totalPaginas: number };
+
+export type ServicioApi = {
   id: string;
-  odontologoId: string;
-  odontologoNombre?: string;
+  categoriaId: number;
   categoria: string;
   titulo: string;
   descripcion?: string | null;
   precioTotal: number;
-  /** El backend lo recalcula con un trigger: úsalo tal cual, no calcules el 20 % en el cliente. */
+  /** Lo calcula el backend; no lo recalcules en el cliente. */
   montoDeposito: number;
   duracionMinutos: number;
-  imagenUrl?: string | null;
+  activo: boolean;
 };
 
-export type Page<T> = { contenido: T[]; pagina: number; totalPaginas: number; totalElementos: number };
+export type HorarioApi = { diaSemana: string; horaInicio: string; horaFin: string; intervaloMinutos?: number | null };
+export type FotoConsultorioApi = { id: string; url: string; descripcion?: string | null; orden: number };
 
-export type OdontologoFiltros = { distrito?: string; especialidad?: string; q?: string; pagina?: number; tamano?: number };
-export type ServicioFiltros = { categoria?: string; odontologoId?: string; q?: string; pagina?: number; tamano?: number };
+export type PerfilPublico = {
+  id: string;
+  nombre: string;
+  fotoUrl?: string | null;
+  consultorio?: string | null;
+  direccion?: string | null;
+  distrito?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  numeroColegiatura: string;
+  colegiaturaVerificada: boolean;
+  calificacion?: number | null;
+  totalResenas?: number | null;
+  requiereConfirmacionManual: boolean;
+  especialidades: ItemCatalogo[];
+  servicios: ServicioApi[];
+  horarios: HorarioApi[];
+  fotos: FotoConsultorioApi[];
+};
 
-export const listarOdontologos = (f: OdontologoFiltros = {}, signal?: AbortSignal) =>
-  api<Page<OdontologoListItemDto>>('/api/public/odontologos', { auth: false, query: f, signal });
+export type Turno = { inicio: string; fin: string };
+export type Disponibilidad = {
+  odontologoId: string;
+  servicioId: string;
+  fecha: string;
+  zonaHoraria: string;
+  duracionMinutos: number;
+  turnos: Turno[];
+};
 
-export const listarServicios = (f: ServicioFiltros = {}, signal?: AbortSignal) =>
-  api<Page<ServicioDto>>('/api/public/servicios', { auth: false, query: f, signal });
+export type FiltrosOdontologos = {
+  distrito?: string;
+  especialidadId?: number;
+  categoriaId?: number;
+  q?: string;
+  lat?: number;
+  lng?: number;
+  radioKm?: number;
+  orden?: string;
+  pagina?: number;
+  tamano?: number;
+};
 
-/* ── adaptadores: del contrato del backend a los tipos que ya usa tu UI ── */
+/* ───────── llamadas ───────── */
+export const buscarOdontologos = (f: FiltrosOdontologos = {}, signal?: AbortSignal) =>
+  api<Pagina<OdontologoTarjeta>>('/api/odontologos', { auth: false, query: f, signal });
 
-export function toServiceItem(s: ServicioDto): ServiceItem {
+export const obtenerOdontologo = (id: string, signal?: AbortSignal) =>
+  api<PerfilPublico>(`/api/odontologos/${id}`, { auth: false, signal });
+
+/** `fecha` en formato AAAA-MM-DD. Los turnos vienen con zona horaria (ej. 2026-10-20T09:00:00-05:00): reenvía `inicio` tal cual al reservar. */
+export const obtenerDisponibilidad = (odontologoId: string, servicioId: string, fecha: string, signal?: AbortSignal) =>
+  api<Disponibilidad>(`/api/odontologos/${odontologoId}/disponibilidad`, { auth: false, query: { servicioId, fecha }, signal });
+
+export const listarEspecialidades = () => api<ItemCatalogo[]>('/api/catalogos/especialidades', { auth: false });
+export const listarCategorias = () => api<ItemCatalogo[]>('/api/catalogos/categorias-servicio', { auth: false });
+export const listarDistritos = () => api<string[]>('/api/catalogos/distritos', { auth: false });
+
+/* ───────── adaptadores a los tipos que ya usa tu UI ───────── */
+export function toDentistLocation(o: OdontologoTarjeta): DentistLocation {
+  return {
+    id: o.id,
+    name: o.nombre,
+    specialty: o.especialidades[0] ?? 'Odontología General',
+    rating: Number(o.calificacion ?? 0),
+    reviews: o.totalResenas ?? 0,
+    cop: '',
+    address: o.consultorio ?? '',
+    district: o.distrito ?? undefined,
+    lat: 0,
+    lng: 0,
+    image: o.fotoUrl ?? '',
+    price: Number(o.precioDesde ?? 0),
+  };
+}
+
+export function toServiceItem(s: ServicioApi, imageUrl?: string | null, dentistName?: string): ServiceItem {
   return {
     id: s.id,
     title: s.titulo,
     description: s.descripcion ?? '',
     category: s.categoria,
-    priceTotal: s.precioTotal,
+    priceTotal: Number(s.precioTotal),
     durationMin: s.duracionMinutos,
-    imageUrl: s.imagenUrl,
-    dentistName: s.odontologoNombre,
-    depositAmount: s.montoDeposito,
-  };
-}
-
-export function toDentistLocation(o: OdontologoListItemDto): DentistLocation {
-  return {
-    id: o.id,
-    name: o.nombreCompleto,
-    specialty: o.especialidades[0] ?? 'Odontología General',
-    rating: o.calificacionPromedio,
-    reviews: o.totalResenas,
-    cop: o.numeroColegiatura,
-    address: o.direccionConsultorio ?? '',
-    district: o.distritoConsultorio ?? undefined,
-    lat: o.latitudConsultorio ?? 0,
-    lng: o.longitudConsultorio ?? 0,
-    image: o.fotoPerfilUrl ?? '',
-    price: o.precioDesde ?? 0,
+    imageUrl: imageUrl ?? null,
+    dentistName,
+    depositAmount: Number(s.montoDeposito),
   };
 }
