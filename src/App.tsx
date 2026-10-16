@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode, useEffect } from 'react';
 import { AppProvider, useApp } from './store';
 import SplashScreen from './screens/SplashScreen';
 import WelcomeTutorial from './screens/WelcomeTutorial';
@@ -14,6 +14,7 @@ import Chatbot from './screens/Chatbot';
 import DentistProfile from './screens/DentistProfile';
 import PatientProfile from './screens/PatientProfile';
 import ConfirmarCita from './screens/ConfirmarCita';
+import DiagnosticoConexion from './screens/DiagnosticoConexion';
 import SettingsModal from './components/SettingsModal';
 import PatientBottomNav from './components/PatientBottomNav';
 import { TourProvider, TourTrigger } from './components/Tour';
@@ -147,9 +148,42 @@ const dentistTourConfig: TourConfig = {
   ],
 };
 
+/** Pantallas previas al login: con una sesión válida no deben mostrarse. */
+const PRE_AUTH_SCREENS = new Set<Screen>(['splash', 'tutorial', 'onboarding']);
+
+/** Abre el diagnóstico de conexión con el backend: http://localhost:5173/?diagnostico=1 */
+const SHOW_DIAGNOSTICO = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('diagnostico');
+
 function AppContent() {
-  const { screen } = useApp();
+  const { screen, setScreen, isAuth, role, sessionLoading } = useApp();
   const isPatientScreen = PATIENT_SCREENS.has(screen);
+
+  // Sesión restaurada con el refresh token (o login/registro): salta splash, tutorial y login y entra directo
+  // al panel que corresponde al rol REAL que devolvió el servidor.
+  useEffect(() => {
+    if (sessionLoading || !isAuth) return;
+    if (PRE_AUTH_SCREENS.has(screen)) {
+      setScreen(role === 'dentist' ? 'dentistPanel' : 'patientDashboard');
+    }
+  }, [sessionLoading, isAuth, role, screen, setScreen]);
+
+  // Protección de rutas: sin sesión no se entra a pantallas de paciente ni al panel del odontólogo.
+  // (El marketplace es público en el backend, así que se deja abierto para explorar antes de registrarse.)
+  useEffect(() => {
+    if (sessionLoading || isAuth) return;
+    const PROTEGIDAS = new Set<Screen>(['misCitas', 'notificaciones', 'checkout', 'confirmarCita', 'patientProfile', 'dentistPanel', 'dentistProfile', 'patientDashboard']);
+    if (PROTEGIDAS.has(screen)) setScreen('onboarding');
+  }, [sessionLoading, isAuth, screen, setScreen]);
+
+  if (SHOW_DIAGNOSTICO) {
+    return (
+      <div className="min-h-screen bg-slatey-100">
+        <div className="w-full max-w-md mx-auto min-h-screen bg-slatey-50 relative shadow-xl">
+          <DiagnosticoConexion />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <TourProvider>
