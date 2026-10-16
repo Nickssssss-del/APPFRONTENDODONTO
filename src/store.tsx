@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, SessionInfo, AppointmentRequest, DayLabel } from './types';
-import { restoreSession } from './api/auth';
+import { restoreSession, logout as apiLogout } from './api/auth';
 import { SESSION_EXPIRED_EVENT } from './api/http';
+import { obtenerYo } from './api/usuarios';
+import { agendaOdontologo, cancelarCita, confirmarCita, misCitas, pagarDeposito, reservarCita, type CitaApi, type MetodoPago } from './api/citas';
 
 export type AppState = {
   role: Role;
@@ -48,6 +50,12 @@ export type AppState = {
   setSelectedDay: (d: string) => void;
   selectedTime: string | null;
   setSelectedTime: (t: string | null) => void;
+  /** Inicio EXACTO del turno elegido (con zona horaria, tal como lo devuelve /disponibilidad). Es lo que se envía a POST /api/citas. */
+  selectedSlotStart: string | null;
+  setSelectedSlotStart: (t: string | null) => void;
+  /** Nombre del odontólogo elegido en el marketplace (para mostrarlo en confirmación y pago). */
+  selectedDentistName: string;
+  setSelectedDentistName: (n: string) => void;
   agendaLocked: boolean;
   setAgendaLocked: (locked: boolean) => void;
   appointmentRequests: AppointmentRequest[];
@@ -65,6 +73,14 @@ export type AppState = {
   dentistWorkSchedules: Record<string, Record<string, { active: boolean; start: string; end: string }>>;
   setDentistWorkSchedules: (s: Record<string, Record<string, { active: boolean; start: string; end: string }>>) => void;
   loginWithGoogle: (idToken: string) => Promise<void>;
+  /** Cierra la sesión: borra tokens y datos del usuario. */
+  logout: () => void;
+  /** Vuelve a pedir las citas reales al backend (paciente: /api/citas/mias, odontólogo: /api/odontologos/yo/citas). */
+  refreshAppointments: () => Promise<void>;
+  /** Reserva real en el backend (POST /api/citas) y paga el depósito (POST /api/citas/{id}/pagar). `inicio` = turno exacto de la disponibilidad. */
+  reservarYPagar: (odontologoId: string, servicioId: string, inicio: string, metodo: MetodoPago) => Promise<CitaApi>;
+  /** Cancela una cita real (PATCH /api/citas/{id}/cancelar). */
+  cancelarCitaReal: (id: string, motivo?: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppState | null>(null);
@@ -138,9 +154,48 @@ function formatMinutesToTime(minutes: number): string {
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 }
 
+/* ───────── sincronización con el backend ───────── */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Las citas reales tienen id UUID; las simuladas locales usan `request-<timestamp>`. */
+export const isRealId = (id: string) => UUID_RE.test(id);
+
+/**
+ * Convierte una cita del backend al modelo que ya usa la UI.
+ * `inicio` llega con la zona del consultorio (ej. 2026-10-20T09:00:00-05:00): se lee la hora tal como viene,
+ * sin pasarla por Date, para no mostrar la hora del navegador.
+ */
+function citaToRequest(c: CitaApi): AppointmentRequest | null {
+  let status: AppointmentRequest['status'];
+  switch (c.estado) {
+    case 'PENDIENTE_CONFIRMACION': status = 'PENDING_APPROVAL'; break;
+    case 'CONFIRMADA':
+    case 'COMPLETADA': status = 'CONFIRMED'; break;
+    case 'REPROGRAMADA': status = 'RESCHEDULE_REQUESTED'; break;
+    default: return null; // PENDIENTE_PAGO (turno retenido), canceladas e inasistencias no se listan como solicitudes
+  }
+  const [y, m, d] = c.inicio.slice(0, 10).split('-').map(Number);
+  const dayLabel = DAY_LABELS[(new Date(y, m - 1, d).getDay() + 6) % 7] as DayLabel; // getDay(): 0 = domingo
+  const minutos = Math.max(15, Math.round((new Date(c.fin).getTime() - new Date(c.inicio).getTime()) / 60000));
+  return {
+    id: c.id,
+    dentistId: c.odontologo.id,
+    patientName: c.paciente?.nombre ?? '',
+    patientDni: '',
+    patientAge: '',
+    patientEmail: c.paciente?.correo ?? '',
+    patientPhone: c.paciente?.telefono ?? '',
+    treatment: { id: c.servicio.id, name: c.servicio.titulo, price: Number(c.precio), description: '', duration: minutos },
+    dayLabel,
+    selectedDay: `${dayLabel} ${d}`,
+    selectedTime: c.inicio.slice(11, 16),
+    status,
+    createdAt: new Date(c.creadoEn).getTime() || Date.now(),
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role>('patient');
-  const [screen, setScreen] = useState<Screen>('splash');
+  const [screen, setScreenRaw] = useState<Screen>('splash');
   const [selectedTreatment, setSelectedTreatment] = useState<Treatment>(TREATMENTS[0]);
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [holdSeconds, setHoldSeconds] = useState(600);
@@ -167,11 +222,66 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedDentistId, setSelectedDentistId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('Lun 15');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedSlotStart, setSelectedSlotStart] = useState<string | null>(null);
+  const [selectedDentistName, setSelectedDentistName] = useState('');
   const [agendaLocked, setAgendaLocked] = useState(false);
   const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
   const [reschedulingRequestId, setReschedulingRequestId] = useState<string | null>(null);
   const [reservedSlots, setReservedSlots] = useState<Record<string, string[]>>({});
   const [dentistWorkSchedules, setDentistWorkSchedules] = useState<Record<string, Record<string, { active: boolean; start: string; end: string }>>>(DENTIST_WORK_SCHEDULE);
+
+  // Refs para que los callbacks estables vean siempre el rol y la sesión actuales.
+  const isAuthRef = useRef(false);
+  const roleRef = useRef<Role>('patient');
+  isAuthRef.current = isAuth;
+  roleRef.current = role;
+
+  const logout = useCallback(() => {
+    apiLogout(); // borra access (memoria) y refresh (localStorage)
+    isAuthRef.current = false;
+    setIsAuth(false);
+    setRole('patient');
+    setUser({ fullName: '', email: '', phone: '', dni: '', age: '' });
+    setAppointmentRequests([]);
+    setReservedSlots({});
+    setSelectedDentistId(null);
+    setSelectedTime(null);
+    setSelectedSlotStart(null);
+    setSelectedDentistName('');
+    setReschedulingRequestId(null);
+    setShowWelcomeBanner(false);
+  }, []);
+
+  // Cualquier salto a "onboarding" con sesión abierta (p. ej. "Cerrar sesión" en Ajustes) cierra la sesión de verdad.
+  const setScreen = useCallback((s: Screen) => {
+    if (s === 'onboarding' && isAuthRef.current) logout();
+    setScreenRaw(s);
+  }, [logout]);
+
+  const refreshAppointments = useCallback(async () => {
+    if (!isAuthRef.current) return;
+    try {
+      const citas = roleRef.current === 'dentist' ? await agendaOdontologo() : await misCitas();
+      if (!isAuthRef.current) return; // se cerró la sesión mientras llegaba la respuesta
+      const reales = citas.map(citaToRequest).filter((r): r is AppointmentRequest => r !== null);
+      // Se conservan las solicitudes simuladas locales (id no UUID) y se reemplazan las reales por lo que dice el servidor.
+      setAppointmentRequests((current) => [...current.filter((r) => !isRealId(r.id)), ...reales]);
+    } catch (e) {
+      console.error('No se pudieron sincronizar las citas', e);
+    }
+  }, []);
+
+  const reservarYPagar = useCallback(async (odontologoId: string, servicioId: string, inicio: string, metodo: MetodoPago) => {
+    const cita = await reservarCita(odontologoId, servicioId, inicio);
+    const pago = await pagarDeposito(cita.id, metodo);
+    await refreshAppointments();
+    return pago.cita;
+  }, [refreshAppointments]);
+
+  const cancelarCitaReal = useCallback(async (id: string, motivo?: string) => {
+    await cancelarCita(id, motivo);
+    await refreshAppointments();
+  }, [refreshAppointments]);
 
   const isDayAvailable = (dentistId: string, dayLabel: string): boolean => {
     const schedule = dentistWorkSchedules[dentistId];
@@ -244,6 +354,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setAppointmentRequests((current) => current.map((request) => (
       request.id === id ? { ...request, status: 'CONFIRMED' } : request
     )));
+    if (isRealId(id)) {
+      // Cita real: la confirma el servidor; si falla, refresh devuelve el estado verdadero.
+      confirmarCita(id).then(refreshAppointments).catch((e) => {
+        console.error('No se pudo confirmar la cita', e);
+        void refreshAppointments();
+      });
+    }
   };
 
   const requestAppointmentReschedule = (id: string) => {
@@ -286,7 +403,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       try {
         const ok = await restoreSession();
-        if (mounted && ok) setIsAuth(true);
+        if (mounted && ok) setIsAuth(true); // los datos del usuario los carga el efecto de más abajo
       } catch {
         // sin sesión activa
       } finally {
@@ -295,15 +412,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })();
 
     const onExpired = () => {
-      setIsAuth(false);
-      setScreen('onboarding');
+      logout();
+      setScreenRaw('onboarding');
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => {
       mounted = false;
       window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
     };
-  }, []);
+  }, [logout]);
+
+  // Con sesión abierta (login, registro o sesión restaurada): trae el perfil real y las citas, y las mantiene al día.
+  useEffect(() => {
+    if (!isAuth) return;
+    let cancelled = false;
+
+    obtenerYo()
+      .then((yo) => {
+        if (cancelled) return;
+        setRole(yo.rol === 'ODONTOLOGO' ? 'dentist' : 'patient');
+        setUser((u) => ({
+          ...u,
+          fullName: yo.nombreCompleto,
+          email: yo.correo,
+          phone: yo.telefono ?? u.phone,
+          dni: yo.numeroDocumento,
+        }));
+      })
+      .catch((e) => console.error('No se pudo cargar el perfil', e))
+      .finally(() => {
+        if (!cancelled) void refreshAppointments();
+      });
+
+    const timer = setInterval(() => void refreshAppointments(), 60_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void refreshAppointments(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [isAuth, refreshAppointments]);
 
   useEffect(() => {
     if (!isHoldActive) return;
@@ -329,31 +478,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setHoldSeconds(600);
   };
 
-  const loginWithGoogle = async (idToken: string) => {
-    try {
-      const res = await fetch('/api/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-      if (!res.ok) throw new Error('Google auth failed');
-      const data = await res.json();
-      // Expect backend to return { token: string, user: UserProfile, role: Role }
-      if (data.token) {
-        localStorage.setItem('jwt', data.token);
-      }
-      if (data.user) {
-        setUser(data.user);
-        setRole(data.role || 'patient');
-        setIsAuth(true);
-        // navigate after auth
-        setScreen(data.role === 'dentist' ? 'dentistPanel' : 'patientDashboard');
-        if (data.role === 'dentist') setShowWelcomeBanner(true);
-      }
-    } catch (e) {
-      console.error('Google login error', e);
-      throw e;
-    }
+  // El backend (AuthController) solo expone /register, /login y /refresh: todavía NO existe /api/auth/google.
+  // Se deja la firma para no romper la UI, pero se informa con claridad en vez de llamar a un endpoint inexistente.
+  const loginWithGoogle = async (_idToken: string): Promise<void> => {
+    throw new Error('El inicio de sesión con Google aún no está disponible. Usa tu correo y contraseña.');
   };
 
   return (
@@ -382,6 +510,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedDentistId, setSelectedDentistId,
         selectedDay, setSelectedDay,
         selectedTime, setSelectedTime,
+        selectedSlotStart, setSelectedSlotStart,
+        selectedDentistName, setSelectedDentistName,
         agendaLocked, setAgendaLocked,
         appointmentRequests,
         createAppointmentRequest,
@@ -397,6 +527,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dentistWorkSchedules,
         setDentistWorkSchedules,
         loginWithGoogle,
+        logout,
+        refreshAppointments,
+        reservarYPagar,
+        cancelarCitaReal,
       }}
     >
       {children}

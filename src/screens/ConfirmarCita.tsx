@@ -9,6 +9,7 @@ import { Button, Badge } from '@/components/ui';
 export default function ConfirmarCita() {
   const {
     selectedTreatment,
+    selectedDentistName,
     selectedDay,
     selectedTime,
     user,
@@ -60,10 +61,11 @@ export default function ConfirmarCita() {
             <div className="flex-1">
               <h3 className="font-bold text-slatey-900 text-sm">{selectedTreatment.name}</h3>
               <p className="text-sm font-semibold text-slatey-600">
-                Dr. Carlos Mendoza · {selectedDay}, {selectedTime}
+                {selectedDentistName || 'Odontólogo'} · {selectedDay}, {selectedTime}
               </p>
               <p className="text-xs text-slatey-500">
-                Duración: 60 min · Tarifa: S/ {selectedTreatment.price.toFixed(2)}
+                Duración: {selectedTreatment.duration} min · Tarifa: S/ {selectedTreatment.price.toFixed(2)}
+                {selectedTreatment.deposit != null && ` · Depósito: S/ ${selectedTreatment.deposit.toFixed(2)}`}
               </p>
             </div>
           </div>

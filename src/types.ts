@@ -23,6 +23,8 @@ export type Treatment = {
   price: number;
   description: string;
   duration: number;
+  /** monto_deposito que calcula el backend (solo servicios reales). */
+  deposit?: number;
 };
 
 /** Servicio del catálogo tal como llega de la BD (tabla `servicios` + `categorias_servicio`). */

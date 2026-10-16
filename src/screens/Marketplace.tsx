@@ -1,166 +1,141 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import {
-  Star, MapPin, BadgeCheck, Clock, AlertCircle, ArrowRight, Calendar, Check,
-  CreditCard, User as UserIcon, Loader2, ShieldCheck, Stethoscope,
+  Star, MapPin, BadgeCheck, AlertCircle, ArrowRight, Calendar, Check, Search, Loader2, RefreshCw,
 } from 'lucide-react';
-import { useApp, TREATMENTS, formatTime, DNI_DATABASE, DAY_LABELS, DENTIST_WORK_SCHEDULE } from '../store';
-import { Button, Badge, Modal } from '../components/ui';
-import type { DentistLocation } from '@/types';
+import { useApp, formatTime, DAY_LABELS } from '../store';
+import { Button, Badge } from '../components/ui';
+import { useAsync } from '@/hooks/useAsync';
+import { buscarOdontologos, obtenerDisponibilidad, obtenerOdontologo, type ServicioApi } from '@/api/catalog';
 
-const DENTISTS: DentistLocation[] = [
-  {
-    id: '1',
-    name: 'Dr. Carlos Mendoza',
-    specialty: 'Odontólogo General',
-    rating: 4.9,
-    reviews: 127,
-    cop: 'COP 34512',
-    address: 'Av. Javier Prado 1234, San Isidro',
-    lat: 40,
-    lng: 25,
-    image: 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-    price: 80,
-  },
-  {
-    id: '2',
-    name: 'Dra. Patricia Ruiz',
-    specialty: 'Ortodoncista',
-    rating: 4.8,
-    reviews: 89,
-    cop: 'COP 28765',
-    address: 'Av. Arequipa 2345, Lince',
-    lat: 65,
-    lng: 55,
-    image: 'https://images.pexels.com/photos/6812464/pexels-photo-6812464.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-    price: 120,
-  },
-  {
-    id: '3',
-    name: 'Dr. Miguel Torres',
-    specialty: 'Endodoncista',
-    rating: 4.7,
-    reviews: 64,
-    cop: 'COP 45123',
-    address: 'Av. Brasil 5678, Jesús María',
-    lat: 25,
-    lng: 65,
-    image: 'https://images.pexels.com/photos/37458054/pexels-photo-37458054.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-    price: 90,
-  },
-  {
-    id: '4',
-    name: 'Dra. Lucía Vargas',
-    specialty: 'Odontopediatra',
-    rating: 5.0,
-    reviews: 152,
-    cop: 'COP 31234',
-    address: 'Av. La Marina 3456, San Miguel',
-    lat: 75,
-    lng: 30,
-    image: 'https://images.pexels.com/photos/32205053/pexels-photo-32205053.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-    price: 70,
-  },
-];
+/* ───────── utilidades de fecha (zona horaria de Lima, UTC-5, sin horario de verano) ───────── */
+type Dia = { iso: string; label: string; num: number; texto: string };
 
-const CLINIC_IMAGES = [
-  'https://images.pexels.com/photos/305567/pexels-photo-305567.jpeg?auto=compress&cs=tinysrgb&h=400&w=600',
-  'https://images.pexels.com/photos/6502543/pexels-photo-6502543.jpeg?auto=compress&cs=tinysrgb&h=400&w=600',
-  'https://images.pexels.com/photos/6809639/pexels-photo-6809639.jpeg?auto=compress&cs=tinysrgb&h=400&w=600',
-  'https://images.pexels.com/photos/4269268/pexels-photo-4269268.jpeg?auto=compress&cs=tinysrgb&h=400&w=600',
-  'https://images.pexels.com/photos/6809648/pexels-photo-6809648.jpeg?auto=compress&cs=tinysrgb&h=400&w=600',
-];
+/** Los próximos `n` días a partir de HOY en Lima: [{ iso: '2026-10-20', label: 'Mar', num: 20, texto: 'Mar 20' }, …]. */
+function proximosDias(n = 14): Dia[] {
+  const lima = new Date(Date.now() - 5 * 3600_000);
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date(Date.UTC(lima.getUTCFullYear(), lima.getUTCMonth(), lima.getUTCDate() + i));
+    const label = DAY_LABELS[(d.getUTCDay() + 6) % 7]; // getUTCDay(): 0 = domingo
+    const num = d.getUTCDate();
+    return { iso: d.toISOString().slice(0, 10), label, num, texto: `${label} ${num}` };
+  });
+}
 
-const DOCTOR_AVATAR = 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200';
-const COVER_IMAGE = 'https://images.pexels.com/photos/38055773/pexels-photo-38055773.jpeg?auto=compress&cs=tinysrgb&h=400&w=900';
+/** El turno llega con la zona del consultorio (2026-10-20T09:00:00-05:00): se muestra la hora tal cual viene. */
+const horaDeTurno = (inicio: string) => inicio.slice(11, 16);
 
-const DAY_DATE_MAP: Record<string, string> = {
-  'Lun': 'Lun 15',
-  'Mar': 'Mar 16',
-  'Mié': 'Mié 17',
-  'Jue': 'Jue 18',
-  'Vie': 'Vie 19',
-  'Sáb': 'Sáb 20',
-};
+function useDebounced<T>(value: T, ms = 350): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
+}
+
+function Avatar({ nombre, url, className }: { nombre: string; url?: string | null; className: string }) {
+  const [fallo, setFallo] = useState(false);
+  if (url && !fallo) {
+    return <img src={url} alt={nombre} onError={() => setFallo(true)} className={`${className} object-cover`} />;
+  }
+  const iniciales = nombre.replace(/^(Dr\.|Dra\.)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
+  return (
+    <div className={`${className} bg-primary-100 text-primary-700 font-bold flex items-center justify-center`}>{iniciales || '🦷'}</div>
+  );
+}
+
+const servicioToTreatment = (s: ServicioApi) => ({
+  id: s.id,
+  name: s.titulo,
+  price: Number(s.precioTotal),
+  description: s.descripcion ?? s.categoria,
+  duration: s.duracionMinutos,
+  deposit: Number(s.montoDeposito),
+});
+
+const BackIcon = () => (
+  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+  </svg>
+);
 
 export default function Marketplace() {
-  const { role, setScreen, selectedTreatment, setSelectedTreatment, startHold, isHoldActive, holdSeconds, user, setUser, selectedDentistId, setSelectedDentistId, isDayAvailable, getAvailableTimeSlots, selectedDay, setSelectedDay, selectedTime, setSelectedTime, agendaLocked, reschedulingRequestId, appointmentRequests } = useApp();
+  const {
+    role, isAuth, setScreen, selectedTreatment, setSelectedTreatment, isHoldActive, holdSeconds,
+    selectedDentistId, setSelectedDentistId, setSelectedDentistName,
+    selectedDay, setSelectedDay, selectedTime, setSelectedTime, setSelectedSlotStart, selectedSlotStart,
+  } = useApp();
+
+  /* ═════════ LISTA: odontólogos reales ═════════ */
+  const [busqueda, setBusqueda] = useState('');
+  const q = useDebounced(busqueda.trim());
+  const lista = useAsync((signal) => buscarOdontologos({ q: q || undefined, tamano: 20 }, signal), [q]);
+
+  /* ═════════ DETALLE: perfil, servicios y turnos reales ═════════ */
+  const dias = useMemo(() => proximosDias(14), []);
+  const [fechaIso, setFechaIso] = useState(dias[0].iso);
+  const [servicioId, setServicioId] = useState<string | null>(null);
   const [galleryIdx, setGalleryIdx] = useState(0);
-  const [showDniModal, setShowDniModal] = useState(false);
-  const [dniInput, setDniInput] = useState('');
-  const [dniVerifying, setDniVerifying] = useState(false);
-  const [dniVerified, setDniVerified] = useState(false);
-  const [dniName, setDniName] = useState('');
-const [dniError, setDniError] = useState(false);
 
-  const currentDentistId = selectedDentistId || '1';
-  const selectedDentist = DENTISTS.find((d) => d.id === currentDentistId) || DENTISTS[0];
-  const isDentistUnavailable = selectedDentist.id === '1' && agendaLocked;
-  const reschedulingRequest = appointmentRequests.find((request) => request.id === reschedulingRequestId);
+  const perfil = useAsync(
+    (signal) => (selectedDentistId ? obtenerOdontologo(selectedDentistId, signal) : Promise.resolve(null)),
+    [selectedDentistId],
+  );
+  const servicios = useMemo(() => (perfil.data?.servicios ?? []).filter((s) => s.activo), [perfil.data]);
+  const servicio = servicios.find((s) => s.id === servicioId) ?? null;
 
-  const handleSelectDentist = (id: string) => {
+  // Al cargar el perfil, deja seleccionado el primer servicio (y lo publica en el store para confirmación y pago).
+  useEffect(() => {
+    if (!servicios.length) return;
+    if (!servicios.some((s) => s.id === servicioId)) {
+      setServicioId(servicios[0].id);
+      setSelectedTreatment(servicioToTreatment(servicios[0]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [servicios]);
+
+  const disponibilidad = useAsync(
+    (signal) => (selectedDentistId && servicioId ? obtenerDisponibilidad(selectedDentistId, servicioId, fechaIso, signal) : Promise.resolve(null)),
+    [selectedDentistId, servicioId, fechaIso],
+  );
+  const turnos = disponibilidad.data?.turnos ?? [];
+
+  const handleSelectDentist = (id: string, nombre: string) => {
     setSelectedDentistId(id);
-    setSelectedDay('Lun 15');
+    setSelectedDentistName(nombre);
+    setServicioId(null);
+    setFechaIso(dias[0].iso);
+    setSelectedDay(dias[0].texto);
     setSelectedTime(null);
+    setSelectedSlotStart(null);
+    setGalleryIdx(0);
   };
 
-  useEffect(() => {
-    if (reschedulingRequest && selectedDay === 'Lun 15') {
-      setSelectedDay(reschedulingRequest.selectedDay);
-    }
-  }, [reschedulingRequest, selectedDay, setSelectedDay]);
-  const currentDayLabel = selectedDay ? DAY_LABELS.find((d) => DAY_DATE_MAP[d] === selectedDay) || DAY_LABELS[0] : DAY_LABELS[0];
-  const isCurrentDayAvailable = isDayAvailable(currentDentistId, currentDayLabel);
-  const availableTimeSlots = isCurrentDayAvailable
-    ? getAvailableTimeSlots(currentDentistId, currentDayLabel, selectedTreatment.duration)
-    : [];
-
-  const handleDaySelect = (dayLabel: string) => {
-    if (!isDayAvailable(currentDentistId, dayLabel)) return;
-    setSelectedDay(DAY_DATE_MAP[dayLabel]);
+  const handleSelectServicio = (s: ServicioApi) => {
+    setServicioId(s.id);
+    setSelectedTreatment(servicioToTreatment(s));
     setSelectedTime(null);
+    setSelectedSlotStart(null);
+  };
+
+  const handleDaySelect = (d: Dia) => {
+    setFechaIso(d.iso);
+    setSelectedDay(d.texto);
+    setSelectedTime(null);
+    setSelectedSlotStart(null);
   };
 
   const handleReserveClick = () => {
-    if (!selectedTime) return;
-    setShowDniModal(true);
+    if (!selectedSlotStart || !servicio) return;
+    setScreen(isAuth ? 'confirmarCita' : 'onboarding');
   };
 
-  const handleDniVerify = () => {
-    setDniVerifying(true);
-    setDniError(false);
-    setTimeout(() => {
-      const data = DNI_DATABASE[dniInput];
-      if (data) {
-        setDniVerifying(false);
-        setDniVerified(true);
-        setDniName(data.name);
-        setUser({ ...user, fullName: data.name, dni: dniInput, age: data.age });
-      } else {
-        setDniVerifying(false);
-        setDniError(true);
-      }
-    }, 1500);
-  };
-
-  const handleConfirmReservation = () => {
-    setShowDniModal(false);
-    setScreen('confirmarCita');
-  };
-
-  const resetDniModal = () => {
-    setShowDniModal(false);
-    setDniInput('');
-    setDniVerifying(false);
-    setDniVerified(false);
-    setDniName('');
-    setDniError(false);
-  };
-
+  /* ═════════ VISTA 1: lista de dentistas ═════════ */
   if (!selectedDentistId) {
+    const items = lista.data?.contenido ?? [];
     return (
       <div className="min-h-screen bg-slatey-50 pb-24">
-        {/* Header */}
         <div className="sticky top-0 z-30 glass border-b border-slatey-100">
           <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
             <div className="flex items-center gap-3">
@@ -168,51 +143,83 @@ const [dniError, setDniError] = useState(false);
                 onClick={() => setScreen(role === 'patient' ? 'patientDashboard' : 'dentistPanel')}
                 className="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
+                <BackIcon />
               </button>
               <div>
                 <h2 className="text-lg font-bold text-slatey-900 font-display">Dentistas disponibles</h2>
                 <p className="text-xs text-slatey-500">Elige un odontólogo para reservar</p>
               </div>
             </div>
-            <Badge variant="primary" size="sm">{DENTISTS.length} disponibles</Badge>
+            {lista.data && <Badge variant="primary" size="sm">{lista.data.totalElementos} disponibles</Badge>}
+          </div>
+        </div>
+
+        <div className="max-w-md mx-auto px-4 pt-4">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slatey-400" />
+            <input
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              placeholder="Buscar por nombre, consultorio o especialidad"
+              className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slatey-200 bg-white text-sm text-slatey-900 placeholder:text-slatey-400 focus:outline-none focus:border-primary-400"
+            />
           </div>
         </div>
 
         <div className="max-w-md mx-auto px-4 py-5 space-y-3">
-          {DENTISTS.map((dentist, i) => (
+          {lista.loading && (
+            <div className="flex items-center justify-center gap-2 py-10 text-slatey-500 text-sm">
+              <Loader2 className="w-5 h-5 animate-spin" /> Cargando odontólogos…
+            </div>
+          )}
+
+          {lista.error && (
+            <div className="p-4 rounded-2xl bg-error-50 border border-error-200 text-center">
+              <p className="text-sm text-error-700 mb-3">{lista.error}</p>
+              <Button size="sm" onClick={lista.reload}><RefreshCw className="w-4 h-4" /> Reintentar</Button>
+            </div>
+          )}
+
+          {!lista.loading && !lista.error && items.length === 0 && (
+            <p className="text-center text-sm text-slatey-500 py-10">No encontramos odontólogos con esa búsqueda.</p>
+          )}
+
+          {items.map((d, i) => (
             <motion.button
-              key={dentist.id}
+              key={d.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
-              onClick={() => handleSelectDentist(dentist.id)}
+              transition={{ delay: Math.min(i, 8) * 0.05 }}
+              onClick={() => handleSelectDentist(d.id, d.nombre)}
               className="w-full flex items-center gap-3 p-4 rounded-2xl bg-white border border-slatey-100 hover:border-primary-200 hover:shadow-md transition-all text-left"
             >
-              <img src={dentist.image} alt={dentist.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-slatey-100 flex-shrink-0" />
+              <Avatar nombre={d.nombre} url={d.fotoUrl} className="w-16 h-16 rounded-2xl border-2 border-slatey-100 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-slatey-900 font-display">{dentist.name}</h3>
-                <p className="text-xs text-slatey-500 mt-0.5">{dentist.specialty}</p>
+                <h3 className="text-sm font-bold text-slatey-900 font-display">{d.nombre}</h3>
+                <p className="text-xs text-slatey-500 mt-0.5 truncate">{d.especialidades.join(' · ') || 'Odontología General'}</p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                  <div className="flex items-center gap-1">
-                    <Star className="w-3.5 h-3.5 fill-accent-400 text-accent-400" />
-                    <span className="text-xs font-bold text-slatey-900">{dentist.rating}</span>
-                    <span className="text-xs text-slatey-400">({dentist.reviews})</span>
-                  </div>
-                  <span className="text-xs text-slatey-300">·</span>
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-slatey-400" />
-                    <span className="text-xs text-slatey-500 truncate">{dentist.district ?? dentist.address.split(',')[1]?.trim() ?? dentist.address}</span>
-                  </div>
+                  {d.calificacion != null && (
+                    <div className="flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 fill-accent-400 text-accent-400" />
+                      <span className="text-xs font-bold text-slatey-900">{Number(d.calificacion).toFixed(1)}</span>
+                      <span className="text-xs text-slatey-400">({d.totalResenas ?? 0})</span>
+                    </div>
+                  )}
+                  {(d.distrito || d.consultorio) && (
+                    <>
+                      {d.calificacion != null && <span className="text-xs text-slatey-300">·</span>}
+                      <div className="flex items-center gap-1 min-w-0">
+                        <MapPin className="w-3 h-3 text-slatey-400 flex-shrink-0" />
+                        <span className="text-xs text-slatey-500 truncate">{d.distrito ?? d.consultorio}</span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                <span className="text-sm font-bold text-primary-600">S/ {dentist.price}</span>
-                <span className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold ${dentist.id === '1' && agendaLocked ? 'bg-slatey-200 text-slatey-500' : 'bg-primary-500 text-white'}`}>
-                  {dentist.id === '1' && agendaLocked ? 'No disponible temporalmente' : 'Reservar'}
-                  {!(dentist.id === '1' && agendaLocked) && <ArrowRight className="w-3 h-3" />}
+                {d.precioDesde != null && <span className="text-sm font-bold text-primary-600">Desde S/ {Number(d.precioDesde).toFixed(0)}</span>}
+                <span className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-primary-500 text-white">
+                  Reservar <ArrowRight className="w-3 h-3" />
                 </span>
               </div>
             </motion.button>
@@ -222,310 +229,234 @@ const [dniError, setDniError] = useState(false);
     );
   }
 
-return (
+  /* ═════════ VISTA 2: detalle + reserva ═════════ */
+  const volverALista = () => {
+    setSelectedDentistId(null);
+    setSelectedDentistName('');
+    setSelectedTime(null);
+    setSelectedSlotStart(null);
+  };
+
+  if (perfil.loading || perfil.error || !perfil.data) {
+    return (
+      <div className="min-h-screen bg-slatey-50 flex flex-col items-center justify-center px-6 text-center gap-4">
+        {perfil.error ? (
+          <>
+            <AlertCircle className="w-8 h-8 text-error-500" />
+            <p className="text-sm text-slatey-700">{perfil.error}</p>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={perfil.reload}><RefreshCw className="w-4 h-4" /> Reintentar</Button>
+              <Button size="sm" variant="outline" onClick={volverALista}>Volver</Button>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-2 text-slatey-500 text-sm"><Loader2 className="w-5 h-5 animate-spin" /> Cargando perfil…</div>
+        )}
+      </div>
+    );
+  }
+
+  const p = perfil.data;
+  const fotos = p.fotos;
+  const especialidades = p.especialidades.map((e) => e.nombre).join(' · ') || 'Odontología General';
+  const deposito = servicio ? Number(servicio.montoDeposito) : 0;
+  const esDentista = role === 'dentist';
+  const mapsUrl = p.latitud != null && p.longitud != null
+    ? `https://www.google.com/maps/search/?api=1&query=${p.latitud},${p.longitud}`
+    : p.direccion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.direccion}, ${p.distrito ?? ''}`)}` : null;
+
+  return (
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50 pb-24">
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-      {/* Cover */}
-      <div className="relative h-44 overflow-hidden">
-        <img src={COVER_IMAGE} alt="Consultorio" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-gradient-to-t from-slatey-900/70 via-slatey-900/20 to-transparent" />
-        <button
-          onClick={() => setSelectedDentistId(null)}
-          className="absolute top-4 left-4 p-2.5 rounded-xl glass text-white hover:bg-white/20 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <button className="absolute top-4 right-4 p-2.5 rounded-xl glass text-white hover:bg-white/20 transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Doctor Info */}
-      <div className="px-4 -mt-12 relative z-10">
-        <div className="bg-white rounded-3xl shadow-lg shadow-slatey-900/5 p-5">
-          <div className="flex items-start gap-4">
-            <img
-              src={selectedDentist.image}
-              alt={selectedDentist.name}
-              className="w-16 h-16 rounded-2xl object-cover border-2 border-white shadow-md -mt-8"
-            />
-            <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold text-slatey-900 font-display">{selectedDentist.name}</h2>
-              <p className="text-sm text-slatey-500">{selectedDentist.specialty} · Lima</p>
-              <p className="text-xs text-slatey-600 mt-2 leading-relaxed italic">
-                "Apasionado por crear sonrisas saludables. Más de 10 años de experiencia en odontología general y estética dental."
-              </p>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                <Badge variant="success" size="sm">
-                  <BadgeCheck className="w-3.5 h-3.5" />
-                  {selectedDentist.cop} Verificado
-                </Badge>
-                <div className="flex items-center gap-1">
-                  <Star className="w-4 h-4 fill-accent-400 text-accent-400" />
-                  <span className="text-sm font-bold text-slatey-900">{selectedDentist.rating}</span>
-                  <span className="text-xs text-slatey-400">({selectedDentist.reviews} reseñas)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-50 text-primary-600 text-sm font-semibold hover:bg-primary-100 transition-colors">
-            <MapPin className="w-4 h-4" />
-            Ver en Maps
+        {/* Portada */}
+        <div className="relative h-44 overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700">
+          {fotos[0] && <img src={fotos[0].url} alt="Consultorio" className="w-full h-full object-cover" />}
+          <div className="absolute inset-0 bg-gradient-to-t from-slatey-900/70 via-slatey-900/20 to-transparent" />
+          <button onClick={volverALista} className="absolute top-4 left-4 p-2.5 rounded-xl glass text-white hover:bg-white/20 transition-colors">
+            <BackIcon />
           </button>
         </div>
-      </div>
 
-      {/* Gallery */}
-      <div className="px-4 mt-6">
-        <h3 className="text-sm font-bold text-slatey-900 mb-3 px-1">Galería del establecimiento</h3>
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
-          {CLINIC_IMAGES.map((img, i) => (
-            <button
-              key={i}
-              onClick={() => setGalleryIdx(i)}
-              className="flex-shrink-0 w-40 h-28 rounded-2xl overflow-hidden border-2 transition-all"
-              style={{ borderColor: galleryIdx === i ? '#0D9488' : 'transparent' }}
-            >
-              <img src={img} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
-            </button>
-          ))}
+        {/* Info del odontólogo */}
+        <div className="px-4 -mt-12 relative z-10">
+          <div className="bg-white rounded-3xl shadow-lg shadow-slatey-900/5 p-5">
+            <div className="flex items-start gap-4">
+              <Avatar nombre={p.nombre} url={p.fotoUrl} className="w-16 h-16 rounded-2xl border-2 border-white shadow-md -mt-8 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-slatey-900 font-display">{p.nombre}</h2>
+                <p className="text-sm text-slatey-500">{especialidades}</p>
+                {(p.consultorio || p.direccion) && (
+                  <p className="text-xs text-slatey-600 mt-1.5">
+                    {[p.consultorio, p.direccion, p.distrito].filter(Boolean).join(' · ')}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  {p.colegiaturaVerificada ? (
+                    <Badge variant="success" size="sm"><BadgeCheck className="w-3.5 h-3.5" /> COP {p.numeroColegiatura} Verificado</Badge>
+                  ) : (
+                    <Badge variant="primary" size="sm">COP {p.numeroColegiatura} · en verificación</Badge>
+                  )}
+                  {p.calificacion != null && (
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-accent-400 text-accent-400" />
+                      <span className="text-sm font-bold text-slatey-900">{Number(p.calificacion).toFixed(1)}</span>
+                      <span className="text-xs text-slatey-400">({p.totalResenas ?? 0} reseñas)</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            {mapsUrl && (
+              <button
+                onClick={() => window.open(mapsUrl, '_blank', 'noopener')}
+                className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary-50 text-primary-600 text-sm font-semibold hover:bg-primary-100 transition-colors"
+              >
+                <MapPin className="w-4 h-4" /> Ver en Maps
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Galería */}
+        {fotos.length > 0 && (
+          <div className="px-4 mt-6">
+            <h3 className="text-sm font-bold text-slatey-900 mb-3 px-1">Galería del establecimiento</h3>
+            <div className="flex gap-3 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
+              {fotos.map((f, i) => (
+                <button
+                  key={f.id}
+                  onClick={() => setGalleryIdx(i)}
+                  className="flex-shrink-0 w-40 h-28 rounded-2xl overflow-hidden border-2 transition-all"
+                  style={{ borderColor: galleryIdx === i ? '#0D9488' : 'transparent' }}
+                >
+                  <img src={f.url} alt={f.descripcion ?? `Foto ${i + 1}`} className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Servicios */}
+        <div className="px-4 mt-6 pb-4">
+          <h3 className="text-sm font-bold text-slatey-900 mb-3 px-1">Selecciona el tratamiento</h3>
+          {servicios.length === 0 ? (
+            <p className="text-sm text-slatey-500 px-1">Este odontólogo aún no publicó servicios.</p>
+          ) : (
+            <div className="space-y-3">
+              {servicios.map((s) => {
+                const selected = servicioId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSelectServicio(s)}
+                    className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex items-center gap-3 ${selected ? 'border-primary-400 bg-primary-50/50' : 'border-slatey-200 bg-white hover:border-slatey-300'}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selected ? 'border-primary-500 bg-primary-500' : 'border-slatey-300'}`}>
+                      {selected && <Check className="w-3 h-3 text-white" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-sm text-slatey-900">{s.titulo}</span>
+                        <span className="font-bold text-primary-600 text-sm flex-shrink-0">S/ {Number(s.precioTotal).toFixed(2)}</span>
+                      </div>
+                      <p className="text-xs text-slatey-500 mt-0.5">{s.descripcion || s.categoria} · {s.duracionMinutos} min</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Treatments */}
-      <div className="px-4 mt-6">
-        <h3 className="text-sm font-bold text-slatey-900 mb-3 px-1">Selecciona el tratamiento</h3>
-        <div className="space-y-3">
-          {TREATMENTS.map((t) => {
-            const selected = selectedTreatment.id === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setSelectedTreatment(t)}
-                className={`w-full text-left p-4 rounded-2xl border-2 transition-all flex items-center gap-3 ${selected ? 'border-primary-400 bg-primary-50/50' : 'border-slatey-200 bg-white hover:border-slatey-300'}`}
-              >
-                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${selected ? 'border-primary-500 bg-primary-500' : 'border-slatey-300'}`}>
-                  {selected && <Check className="w-3 h-3 text-white" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-sm text-slatey-900">{t.name}</span>
-                    <span className="font-bold text-primary-600 text-sm flex-shrink-0">S/ {t.price.toFixed(2)}</span>
-                  </div>
-                  <p className="text-xs text-slatey-500 mt-0.5">{t.description}</p>
-                </div>
-              </button>
-            );
-          })}
-</div>
-      </div>
-      </div>
-
-      {/* Booking Sheet */}
+      {/* Hoja de reserva */}
       <div className="shrink-0 flex flex-col max-h-[42vh] bg-white rounded-t-3xl shadow-2xl shadow-slatey-900/10 border-t border-slatey-100 overflow-hidden">
-          <div className="flex-shrink-0 flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1.5 rounded-full bg-slatey-200" aria-hidden="true" />
+        <div className="flex-shrink-0 flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1.5 rounded-full bg-slatey-200" aria-hidden="true" />
+        </div>
+
+        <div className="px-5 min-h-0 overflow-y-auto scrollbar-hide">
+          <div className="flex items-center gap-2 mb-3">
+            <Calendar className="w-4 h-4 text-slatey-400" />
+            <span className="text-xs font-semibold text-slatey-500 uppercase tracking-wide">Selecciona día y hora</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
+            {dias.map((d) => {
+              const isSelected = fechaIso === d.iso;
+              return (
+                <button
+                  key={d.iso}
+                  onClick={() => handleDaySelect(d)}
+                  className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${isSelected ? 'border-primary-400 bg-primary-500 text-white' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
+                >
+                  {d.texto}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="px-5 min-h-0 overflow-y-auto scrollbar-hide">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Calendar className="w-4 h-4 text-slatey-400" />
-                    <span className="text-xs font-semibold text-slatey-500 uppercase tracking-wide">Selecciona día y hora</span>
-                  </div>
-                  <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2">
-                    {DAY_LABELS.map((dayLabel) => {
-                      const day = DAY_DATE_MAP[dayLabel];
-                      const available = isDayAvailable(currentDentistId, dayLabel);
-                      const isSelected = selectedDay === day;
-                      return (
-                        <button
-                          key={day}
-                          onClick={() => handleDaySelect(dayLabel)}
-                          disabled={!available}
-                          className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${isSelected ? 'border-primary-400 bg-primary-500 text-white' : available ? 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300' : 'border-slatey-200 bg-slatey-100 text-slatey-400 cursor-not-allowed'}`}
-                        >
-                          {day}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {!isCurrentDayAvailable ? (
-                    <div className="mt-3 flex items-center gap-3 p-4 rounded-xl bg-accent-50 border border-accent-200">
-                      <AlertCircle className="w-5 h-5 text-accent-600 flex-shrink-0" />
-                      <p className="text-sm text-accent-700">El odontólogo no atiende este día</p>
-                    </div>
-                  ) : availableTimeSlots.length === 0 ? (
-                    <div className="mt-3 text-center py-4">
-                      <p className="text-sm text-slatey-500">No hay horarios disponibles para este día</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-4 gap-2 mt-3">
-                      {availableTimeSlots.map((slot) => {
-                        const selected = selectedTime === slot;
-                        return (
-                          <button
-                            key={slot}
-                            onClick={() => setSelectedTime(slot)}
-                            className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selected ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
-                          >
-                            {slot}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {isHoldActive && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-accent-50 border border-accent-200"
-                    >
-                      <AlertCircle className="w-4 h-4 text-accent-600 flex-shrink-0" />
-                      <span className="text-xs font-semibold text-accent-700">
-                        Horario bloqueado por {formatTime(holdSeconds)} min
-                      </span>
-</motion.div>
-                  )}
-
+          {!servicio ? (
+            <p className="mt-3 text-center text-sm text-slatey-500 py-4">Elige un tratamiento para ver los horarios.</p>
+          ) : disponibilidad.loading ? (
+            <div className="mt-3 flex items-center justify-center gap-2 py-4 text-sm text-slatey-500">
+              <Loader2 className="w-4 h-4 animate-spin" /> Buscando horarios…
             </div>
-
-            <div className="flex-shrink-0 border-t border-slatey-100 px-5 py-3">
-              <div className="flex items-center gap-3">
-                <div className="flex-1">
-                  <p className="text-xs text-slatey-500">Garantía de reserva</p>
-                  <p className="text-lg font-bold text-slatey-900">S/ 20.00</p>
-                </div>
-                <Button
-                  size="lg"
-                  disabled={!selectedTime || isDentistUnavailable}
-                  onClick={handleReserveClick}
-                  className="flex-1"
-                >
-                  {isDentistUnavailable ? 'No disponible temporalmente' : 'Reservar Cita'}
-                  {!isDentistUnavailable && <ArrowRight className="w-5 h-5" />}
-                </Button>
-              </div>
-              <p className="text-xs text-slatey-400 text-center mt-2">
-                Garantía S/ 20.00 · 100% reembolsable con 24h de anticipación
-              </p>
+          ) : disponibilidad.error ? (
+            <div className="mt-3 text-center py-3">
+              <p className="text-sm text-error-600 mb-2">{disponibilidad.error}</p>
+              <Button size="sm" onClick={disponibilidad.reload}><RefreshCw className="w-4 h-4" /> Reintentar</Button>
             </div>
-      </div>
-
-      {/* DNI Verification Modal */}
-      <Modal open={showDniModal} onClose={resetDniModal} title="Verificar identidad">
-        <AnimatePresence mode="wait">
-          {!dniVerified ? (
-            <motion.div
-              key="dni-form"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-4"
-            >
-              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-primary-50 border border-primary-100">
-                <ShieldCheck className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-primary-800 leading-relaxed">
-                  Para confirmar tu reserva, ingresa tu DNI. El doctor podrá verificar tu identidad al llegar a la cita.
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slatey-700 mb-1.5">Número de DNI</label>
-                <div className="relative">
-                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slatey-400">
-                    <CreditCard className="w-5 h-5" />
-                  </div>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={dniInput}
-                    onChange={(e) => {
-                      setDniInput(e.target.value.replace(/\D/g, '').slice(0, 8));
-                      setDniError(false);
-                    }}
-                    placeholder="12345678"
-                    maxLength={8}
-                    className={`w-full px-4 py-3.5 pl-11 rounded-2xl border-2 bg-slatey-50 text-slatey-900 placeholder:text-slatey-400 focus:outline-none transition-all ${dniError ? 'border-error-400 bg-error-50' : 'border-slatey-200 focus:border-primary-400 focus:bg-white'}`}
-                  />
-                </div>
-                {dniError && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-xs text-error-600 mt-1.5 font-semibold"
-                  >
-                    DNI no encontrado. Verifica el número e intenta nuevamente.
-                  </motion.p>
-                )}
-                <p className="text-xs text-slatey-400 mt-1.5">Prueba con: 12345678, 87654321, 23456789</p>
-              </div>
-
-              <Button
-                fullWidth
-                size="lg"
-                loading={dniVerifying}
-                disabled={dniInput.length < 8}
-                onClick={handleDniVerify}
-              >
-                Verificar DNI
-              </Button>
-            </motion.div>
+          ) : turnos.length === 0 ? (
+            <div className="mt-3 flex items-center gap-3 p-4 rounded-xl bg-accent-50 border border-accent-200">
+              <AlertCircle className="w-5 h-5 text-accent-600 flex-shrink-0" />
+              <p className="text-sm text-accent-700">No hay horarios disponibles este día. Prueba con otra fecha.</p>
+            </div>
           ) : (
+            <div className="grid grid-cols-4 gap-2 mt-3">
+              {turnos.map((t) => {
+                const hora = horaDeTurno(t.inicio);
+                const selected = selectedSlotStart === t.inicio;
+                return (
+                  <button
+                    key={t.inicio}
+                    onClick={() => { setSelectedTime(hora); setSelectedSlotStart(t.inicio); }}
+                    className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${selected ? 'border-primary-400 bg-primary-50 text-primary-700' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'}`}
+                  >
+                    {hora}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {isHoldActive && (
             <motion.div
-              key="dni-verified"
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-5"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl bg-accent-50 border border-accent-200"
             >
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                className="flex flex-col items-center"
-              >
-                <div className="w-16 h-16 rounded-full bg-success-50 flex items-center justify-center mb-4">
-                  <Check className="w-9 h-9 text-success-500" />
-                </div>
-                <h3 className="text-lg font-bold text-slatey-900 font-display mb-1">Identidad verificada</h3>
-                <p className="text-sm text-slatey-500 text-center">Tu nombre ha sido confirmado y actualizado en tu perfil.</p>
-              </motion.div>
-
-              <div className="flex items-center gap-3 p-4 rounded-2xl bg-slatey-50 border border-slatey-100">
-                <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center flex-shrink-0">
-                  <UserIcon className="w-6 h-6 text-primary-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-slatey-900 text-sm">{dniName}</p>
-                  <p className="text-xs text-slatey-500">DNI: {dniInput} · {user.age || '28'} años</p>
-                </div>
-                <Badge variant="success" size="sm">
-                  <Check className="w-3 h-3" /> Verificado
-                </Badge>
-              </div>
-
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary-50 border border-primary-100">
-                <Clock className="w-4 h-4 text-primary-500 flex-shrink-0" />
-                <span className="text-xs text-primary-700">
-                  Cita: {selectedDay}, {selectedTime} · {selectedTreatment.name}
-                </span>
-              </div>
-
-              <Button fullWidth size="lg" onClick={handleConfirmReservation}>
-                Confirmar y continuar al pago
-                <ArrowRight className="w-5 h-5" />
-              </Button>
+              <AlertCircle className="w-4 h-4 text-accent-600 flex-shrink-0" />
+              <span className="text-xs font-semibold text-accent-700">Horario bloqueado por {formatTime(holdSeconds)} min</span>
             </motion.div>
           )}
-        </AnimatePresence>
-      </Modal>
+        </div>
+
+        <div className="flex-shrink-0 border-t border-slatey-100 px-5 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex-1">
+              <p className="text-xs text-slatey-500">Depósito de reserva</p>
+              <p className="text-lg font-bold text-slatey-900">S/ {deposito.toFixed(2)}</p>
+            </div>
+            <Button size="lg" disabled={!selectedSlotStart || !servicio || esDentista} onClick={handleReserveClick} className="flex-1">
+              {esDentista ? 'Solo pacientes' : isAuth ? 'Reservar Cita' : 'Inicia sesión para reservar'}
+              {!esDentista && <ArrowRight className="w-5 h-5" />}
+            </Button>
+          </div>
+          <p className="text-xs text-slatey-400 text-center mt-2">
+            {selectedTime ? `${selectedDay} · ${selectedTime} · ${selectedTreatment.name}` : 'Reservas con el depósito indicado.'}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
-
