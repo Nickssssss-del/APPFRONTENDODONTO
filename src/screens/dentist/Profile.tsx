@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Camera, User, Mail, Phone, BadgeCheck, CreditCard,
@@ -9,6 +9,11 @@ import { Button, Input, Badge, Modal } from '@/components/ui';
 import { useApp, TREATMENTS } from '@/store';
 import { WEEK_SCHEDULE } from '@/lib/dentistData';
 import type { AgendaPatient, DayLabel } from '@/types';
+import SmartImage from '@/components/SmartImage';
+import { ApiError } from '@/api/http';
+import { agregarFotoConsultorio, eliminarFotoConsultorio, listarFotosConsultorio, subirFotoPerfil, validarImagen } from '@/api/archivos';
+
+type FotoItem = { id: string; url: string; demo?: boolean };
 
 const DEFAULT_PHOTO = 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200';
 
@@ -73,7 +78,73 @@ export default function Profile() {
   const [email, setEmail] = useState('dr.mendoza@odontosystem.pe');
   const [phone, setPhone] = useState('999 888 777');
   const [bio, setBio] = useState('Apasionado por crear sonrisas saludables. Más de 10 años de experiencia en odontología general y estética dental.');
-  const [clinicPhotos, setClinicPhotos] = useState<string[]>(CLINIC_PHOTOS);
+  // Galería: arranca con fotos de ejemplo y se reemplaza por las REALES del backend (Cloudinary) al cargar.
+  const [fotos, setFotos] = useState<FotoItem[]>(CLINIC_PHOTOS.map((url, i) => ({ id: `demo-${i}`, url, demo: true })));
+  const [fotosEstado, setFotosEstado] = useState<'cargando' | 'servidor' | 'demo'>('cargando');
+  const [fotoError, setFotoError] = useState<string | null>(null);
+  const [subiendo, setSubiendo] = useState(false);
+  const galeriaInput = useRef<HTMLInputElement>(null);
+  const perfilInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    listarFotosConsultorio().then(
+      (lista) => {
+        if (cancelado) return;
+        setFotos([...lista].sort((a, b) => a.orden - b.orden).map((f) => ({ id: f.id, url: f.url })));
+        setFotosEstado('servidor');
+      },
+      () => !cancelado && setFotosEstado('demo'),
+    );
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  const agregarFoto = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const err = validarImagen(file);
+    if (err) return setFotoError(err);
+    if (fotosEstado !== 'servidor') return setFotoError('Sin conexión con el servidor: no se puede subir ahora.');
+    setSubiendo(true);
+    setFotoError(null);
+    try {
+      const nueva = await agregarFotoConsultorio(file);
+      setFotos((prev) => [...prev, { id: nueva.id, url: nueva.url }]);
+    } catch (error) {
+      setFotoError(error instanceof ApiError ? error.message : 'No se pudo subir la foto.');
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
+  const quitarFoto = async (f: FotoItem) => {
+    if (!f.demo) {
+      try {
+        await eliminarFotoConsultorio(f.id);
+      } catch (error) {
+        return setFotoError(error instanceof ApiError ? error.message : 'No se pudo eliminar la foto.');
+      }
+    }
+    setFotos((prev) => prev.filter((x) => x.id !== f.id));
+  };
+
+  const cambiarFotoPerfil = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const err = validarImagen(file);
+    if (err) return setFotoError(err);
+    try {
+      const r = await subirFotoPerfil(file);
+      setPhoto(r.fotoPerfilUrl);
+      setFotoError(null);
+    } catch (error) {
+      setFotoError(error instanceof ApiError ? error.message : 'No se pudo cambiar la foto de perfil.');
+    }
+  };
   const [schedule, setSchedule] = useState<Record<string, { active: boolean; start: string; end: string }>>(initialSchedule);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -196,8 +267,9 @@ export default function Profile() {
       <div className="bg-white rounded-2xl p-5 border border-slatey-100">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <img src={photo} alt="Foto de perfil" className="w-20 h-20 rounded-2xl object-cover" />
-            <button className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-primary-500 flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors">
+            <SmartImage src={photo} alt={fullName} ratio="1/1" fallback="avatar" gravity="face" widths={[160, 320]} sizes="80px" className="w-20 h-20 rounded-2xl" />
+            <input ref={perfilInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={cambiarFotoPerfil} />
+            <button onClick={() => perfilInput.current?.click()} aria-label="Cambiar foto de perfil" className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-primary-500 flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors">
               <Camera className="w-4 h-4 text-white" />
             </button>
           </div>
@@ -315,26 +387,35 @@ export default function Profile() {
             <Camera className="w-4 h-4 text-primary-500" />
             <h3 className="text-sm font-bold text-slatey-900">Galería del consultorio</h3>
           </div>
-          <Badge variant="neutral" size="sm">{clinicPhotos.length} fotos</Badge>
+          <Badge variant="neutral" size="sm">{fotos.length} fotos</Badge>
         </div>
+        {fotosEstado === 'demo' && (
+          <p className="mb-2 text-[11px] text-warning-700">Mostrando fotos de ejemplo: no hay conexión con el servidor.</p>
+        )}
+        {fotoError && (
+          <p role="alert" className="mb-2 text-xs font-medium text-error-600">{fotoError}</p>
+        )}
         <div className="grid grid-cols-3 gap-2">
-          {clinicPhotos.map((img, i) => (
-            <div key={i} className="relative aspect-square rounded-xl overflow-hidden border border-slatey-200 group">
-              <img src={img} alt={`Consultorio ${i + 1}`} className="w-full h-full object-cover" />
+          {fotos.map((f, i) => (
+            <div key={f.id} className="relative rounded-xl overflow-hidden border border-slatey-200 group">
+              <SmartImage src={f.url} alt={`Consultorio ${i + 1}`} ratio="1/1" fallback="clinic" widths={[160, 320]} sizes="33vw" />
               <button
-                onClick={() => setClinicPhotos((prev) => prev.filter((_, idx) => idx !== i))}
-                className="absolute top-1 right-1 w-6 h-6 rounded-lg bg-error-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => quitarFoto(f)}
+                aria-label={`Eliminar foto ${i + 1}`}
+                className="absolute top-1 right-1 w-6 h-6 rounded-lg bg-error-500 text-white flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 transition-opacity"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
           ))}
+          <input ref={galeriaInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={agregarFoto} />
           <button
-            onClick={() => setClinicPhotos((prev) => [...prev, 'https://images.pexels.com/photos/4269268/pexels-photo-4269268.jpeg?auto=compress&cs=tinysrgb&h=200&w=200'])}
-            className="aspect-square rounded-xl border-2 border-dashed border-slatey-200 flex flex-col items-center justify-center text-slatey-400 hover:border-primary-300 hover:text-primary-500 transition-colors"
+            onClick={() => galeriaInput.current?.click()}
+            disabled={subiendo || fotos.length >= 10}
+            className="aspect-square rounded-xl border-2 border-dashed border-slatey-200 flex flex-col items-center justify-center text-slatey-400 hover:border-primary-300 hover:text-primary-500 transition-colors disabled:opacity-50"
           >
             <Plus className="w-6 h-6" />
-            <span className="text-xs font-medium mt-1">Agregar</span>
+            <span className="text-xs font-medium mt-1">{subiendo ? 'Subiendo…' : 'Agregar'}</span>
           </button>
         </div>
       </div>

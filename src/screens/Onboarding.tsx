@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, Shield, ArrowRight, User, Stethoscope } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Shield, ArrowRight, User, Stethoscope, Phone, IdCard, Loader2, AlertCircle } from 'lucide-react';
 import { useApp } from '../store';
+import { login, register } from '@/api/auth';
+import { ApiError } from '@/api/http';
 
 export default function Onboarding() {
-  const { setScreen, setUser } = useApp();
+  const { setScreen, setUser, setRole: setAppRole, setIsAuth, user } = useApp();
   const [role, setRole] = useState<'patient' | 'dentist'>('patient');
   const [isRegister, setIsRegister] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -14,21 +16,48 @@ export default function Onboarding() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [copNumber, setCopNumber] = useState(''); // Estado para la colegiatura COP
+  const [docType, setDocType] = useState<'DNI' | 'CE'>('DNI');
+  const [docNumber, setDocNumber] = useState('');
+  const [phone, setPhone] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return;
+    if (loading) return;
+    setError(null);
 
-    setUser({
-      role,
-      fullName: fullName || (role === 'patient' ? 'María González' : 'Dr. Carlos Mendoza'),
-      email,
-    });
+    if (isRegister) {
+      if (password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
+      if (!fullName.trim() || !docNumber.trim() || !phone.trim()) return setError('Completa todos tus datos.');
+      if (role === 'dentist' && !copNumber.trim()) return setError('Ingresa tu número de colegiatura COP.');
+    }
 
-    if (role === 'patient') {
-      setScreen('patientDashboard');
-    } else {
-      setScreen('dentistPanel');
+    setLoading(true);
+    try {
+      const session = isRegister
+        ? await register({
+            numeroDocumento: docNumber.trim(),
+            tipoDocumento: docType,
+            nombreCompleto: fullName.trim(),
+            telefono: phone.trim(),
+            correo: email.trim(),
+            password,
+            rol: role === 'dentist' ? 'ODONTOLOGO' : 'PACIENTE',
+            numeroColegiatura: role === 'dentist' ? copNumber.trim() : undefined,
+          })
+        : await login(email.trim(), password);
+
+      // El rol real lo manda el servidor (no el selector): una cuenta de paciente no entra como odontólogo.
+      const realRole = session.rol === 'ODONTOLOGO' ? 'dentist' : 'patient';
+      setAppRole(realRole);
+      setUser({ ...user, fullName: session.nombreCompleto, email: email.trim(), ...(isRegister ? { dni: docNumber.trim(), phone: phone.trim() } : {}) });
+      setIsAuth(true);
+      setScreen(realRole === 'patient' ? 'patientDashboard' : 'dentistPanel');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo completar la solicitud.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -112,6 +141,54 @@ export default function Onboarding() {
               </div>
             )}
 
+            {isRegister && (
+              <>
+                <div className="grid grid-cols-[88px_1fr] gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slatey-700 block">Documento</label>
+                    <select
+                      value={docType}
+                      onChange={(e) => setDocType(e.target.value as 'DNI' | 'CE')}
+                      className="w-full py-3 px-3 rounded-2xl bg-slatey-50 border border-slatey-200 text-slatey-900 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                    >
+                      <option value="DNI">DNI</option>
+                      <option value="CE">CE</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slatey-700 block">N.º de documento</label>
+                    <div className="relative">
+                      <IdCard className="w-5 h-5 text-slatey-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={20}
+                        value={docNumber}
+                        onChange={(e) => setDocNumber(e.target.value)}
+                        placeholder="12345678"
+                        className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slatey-50 border border-slatey-200 text-slatey-900 placeholder:text-slatey-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-400 transition-all text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slatey-700 block">Teléfono</label>
+                  <div className="relative">
+                    <Phone className="w-5 h-5 text-slatey-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="tel"
+                      inputMode="tel"
+                      maxLength={20}
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="+51 999 999 999"
+                      className="w-full pl-11 pr-4 py-3 rounded-2xl bg-slatey-50 border border-slatey-200 text-slatey-900 placeholder:text-slatey-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-400 transition-all text-sm"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
             <div className="space-y-1">
               <label className="text-xs font-bold text-slatey-700 block">Correo electrónico</label>
               <div className="relative">
@@ -184,12 +261,21 @@ export default function Onboarding() {
               </div>
             )}
 
+            {error && (
+              <div role="alert" className="flex items-start gap-2 rounded-2xl bg-error-50 border border-error-100 px-3.5 py-3 text-xs font-medium text-error-700">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-px" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <button
               type="submit"
-              className="w-full py-3.5 px-4 rounded-2xl bg-primary-500 hover:bg-primary-600 text-white font-bold text-sm shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all mt-2"
+              disabled={loading}
+              className="disabled:opacity-60 w-full py-3.5 px-4 rounded-2xl bg-primary-500 hover:bg-primary-600 text-white font-bold text-sm shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all mt-2"
             >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               {isRegister ? 'Registrarse' : 'Iniciar sesión'}
-              <ArrowRight className="w-4 h-4" />
+              {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
 
@@ -233,7 +319,7 @@ export default function Onboarding() {
             {isRegister ? '¿Ya tienes una cuenta?' : '¿No tienes cuenta?'}{' '}
             <button
               type="button"
-              onClick={() => setIsRegister(!isRegister)}
+              onClick={() => { setIsRegister(!isRegister); setError(null); }}
               className="text-primary-600 font-bold hover:underline"
             >
               {isRegister ? 'Inicia sesión' : 'Regístrate'}

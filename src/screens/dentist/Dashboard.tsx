@@ -9,7 +9,6 @@ import { useApp } from '@/store';
 import { Badge } from '@/components/ui';
 import type { AgendaPatient, AppointmentStatus } from '@/types';
 import { getPatientsByDay, getPatientById, WEEK_SCHEDULE } from '@/lib/dentistData';
-import { supabase } from '@/lib/supabase';
 
 const TREATMENT_PRICES: Record<string, number> = {
   'Limpieza Dental Profunda': 80,
@@ -107,17 +106,8 @@ const monthPatients = 48;
      setMarking(true);
      if (result === 'no_show' && nextPatient) {
        try {
-         // Update appointment status to NO_SHOW in Supabase
-         await supabase
-           .from('appointments')
-           .update({ status: 'NO_SHOW' })
-           .eq('id', nextPatient.id);
-         
-         // Apply strike via edge function or trigger (placeholder)
-         // await supabase.functions.invoke('apply-attendance-strike', {
-         //   body: { patientId: nextPatient.id }
-         // });
-         // For now, we rely on database triggers or refresh data on next fetch
+         // TODO(backend): PATCH /api/citas/{id}/estado { estado: 'NO_SHOW' } (el strike lo aplica el backend).
+         // La Data API de Supabase está cerrada: no se puede escribir en la BD desde el frontend.
        } catch (error) {
          console.error('Failed to mark no_show:', error);
        }

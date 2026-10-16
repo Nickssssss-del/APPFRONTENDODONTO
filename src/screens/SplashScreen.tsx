@@ -1,21 +1,31 @@
 import { motion } from 'framer-motion';
 import { useApp } from '@/store';
 import { useEffect } from 'react';
+import { hasSeenTutorial } from './WelcomeTutorial';
 
 export default function SplashScreen() {
   const { setScreen, splashComplete, setSplashComplete } = useApp();
 
+  // Primer uso -> tutorial; usuarios recurrentes -> directo al login.
+  const goNext = () => {
+    setSplashComplete(true);
+    setScreen(hasSeenTutorial() ? 'onboarding' : 'tutorial');
+  };
+
   useEffect(() => {
     if (splashComplete) return;
-    const timer = setTimeout(() => {
-      setSplashComplete(true);
-      setScreen('onboarding');
-    }, 10000);
+    const timer = setTimeout(goNext, 3500);
     return () => clearTimeout(timer);
-  }, [splashComplete, setScreen, setSplashComplete]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [splashComplete]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 via-primary-700 to-slatey-900 text-white flex flex-col items-center justify-center px-6">
+    <div
+      onClick={goNext}
+      role="button"
+      aria-label="Continuar"
+      className="min-h-screen bg-gradient-to-br from-primary-600 via-primary-700 to-slatey-900 text-white flex flex-col items-center justify-center px-6 cursor-pointer"
+    >
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -143,7 +153,7 @@ export default function SplashScreen() {
               transition={{ duration: 1.5, repeat: Infinity, delay: 0.4 }}
               className="w-2 h-2 rounded-full bg-white"
             />
-            <span className="ml-3">Cargando...</span>
+            <span className="ml-3">Toca para continuar</span>
           </div>
         </motion.div>
       </motion.div>

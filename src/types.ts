@@ -2,6 +2,7 @@ export type Role = 'patient' | 'dentist';
 
 export type Screen =
   | 'splash'
+  | 'tutorial'
   | 'onboarding'
   | 'marketplace'
   | 'checkout'
@@ -22,6 +23,25 @@ export type Treatment = {
   price: number;
   description: string;
   duration: number;
+};
+
+/** Servicio del catálogo tal como llega de la BD (tabla `servicios` + `categorias_servicio`). */
+export type ServiceItem = {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  /** precio_total en soles */
+  priceTotal: number;
+  /** duracion_minutos */
+  durationMin: number;
+  /** URL de Cloudinary (o null si el odontólogo aún no subió foto) */
+  imageUrl?: string | null;
+  dentistName?: string;
+  /** monto_deposito de la BD (lo calcula un trigger). Si falta, se estima con guaranteeRate. */
+  depositAmount?: number;
+  /** Solo como respaldo si no llega depositAmount (0.2 = 20 %). */
+  guaranteeRate?: number;
 };
 
 export type PaymentMethod = 'yape' | 'plin' | 'card';
@@ -84,6 +104,8 @@ export type DentistLocation = {
   reviews: number;
   cop: string;
   address: string;
+  /** distrito_consultorio de la BD; úsalo en vez de parsear `address`. */
+  district?: string;
   lat: number;
   lng: number;
   image: string;

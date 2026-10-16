@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, SessionInfo, AppointmentRequest, DayLabel } from './types';
-import { supabase } from './lib/supabase';
+import { restoreSession } from './api/auth';
+import { SESSION_EXPIRED_EVENT } from './api/http';
 
 export type AppState = {
   role: Role;
@@ -279,38 +280,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
     )));
   };
 
+  // Sesión: el backend (JWT propio) es la única fuente. Supabase solo es la base de datos y su API está cerrada.
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (!mounted) return;
-        if (data.session) {
-          setSession(data.session);
-          setIsAuth(true);
-        }
+        const ok = await restoreSession();
+        if (mounted && ok) setIsAuth(true);
       } catch {
-        // ignore — no active session
+        // sin sesión activa
       } finally {
         if (mounted) setSessionLoading(false);
       }
     })();
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, sess) => {
-      (async () => {
-        if (sess) {
-          setSession(sess);
-          setIsAuth(true);
-        } else {
-          setSession(null);
-          setIsAuth(false);
-        }
-      })();
-    });
-
+    const onExpired = () => {
+      setIsAuth(false);
+      setScreen('onboarding');
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => {
       mounted = false;
-      listener.subscription.unsubscribe();
+      window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
     };
   }, []);
 
