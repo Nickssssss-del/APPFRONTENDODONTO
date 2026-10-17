@@ -4,7 +4,7 @@ import {
   Calendar, DollarSign, Users, Clock, ArrowRight, Lock, Unlock, AlertCircle,
   CheckCircle2, XCircle, User as UserIcon, ShieldCheck, Loader2, Wallet, Hourglass,
 } from 'lucide-react';
-import { useApp } from '@/store';
+import { useApp } from '@/storeHooks';
 import { Badge, Button } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';

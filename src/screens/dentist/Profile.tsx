@@ -5,7 +5,7 @@ import {
   Shield, AlertCircle, CheckCircle2, MapPin, Building2, Loader2, Trash2, CalendarOff, Stethoscope, Pencil, LogOut,
 } from 'lucide-react';
 import { Button, Input, Badge, Toggle } from '@/components/ui';
-import { useApp } from '@/store';
+import { useApp } from '@/storeHooks';
 import SmartImage from '@/components/SmartImage';
 import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';

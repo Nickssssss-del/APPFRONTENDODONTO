@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import {
   Star, MapPin, BadgeCheck, AlertCircle, ArrowRight, Calendar, Check, Search, Loader2, RefreshCw,
 } from 'lucide-react';
-import { useApp, formatTime, DAY_LABELS } from '../store';
+import { useApp, formatTime } from '@/storeHooks';
+import { DAY_LABELS } from '@/constants';
 import { Button, Badge } from '../components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { buscarOdontologos, obtenerDisponibilidad, obtenerOdontologo, type ServicioApi } from '@/api/catalog';

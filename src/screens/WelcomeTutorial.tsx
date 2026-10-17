@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion, type PanInfo } from 'framer-motion';
 import { ArrowRight, BadgeCheck, CalendarCheck, Check, MapPin, ShieldCheck } from 'lucide-react';
-import { useApp } from '@/store';
+import { useApp } from '@/storeHooks';
 
 /* ───────────────────────── persistencia ───────────────────────── */
 

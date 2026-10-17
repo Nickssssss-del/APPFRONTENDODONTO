@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Calendar, Clock, Shield, Star } from 'lucide-react';
-import { formatTime } from '../../store';
+import { formatTime } from '../../storeHooks';
 import type { Treatment } from '../../types';
 
 interface Props {

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import {
   Calendar, Clock, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft,
 } from 'lucide-react';
-import { useApp } from '@/store';
+import { useApp } from '@/storeHooks';
 import { Button, Badge } from '@/components/ui';
 
 export default function ConfirmarCita() {

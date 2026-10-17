@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
-import { useApp } from '../../store';
+import { useApp } from '../../storeHooks';
 import { Button, Modal } from '../../components/ui';
 import { pagarDeposito, reservarCita, type MetodoPago } from '@/api/citas';
 import { ApiError } from '@/api/http';

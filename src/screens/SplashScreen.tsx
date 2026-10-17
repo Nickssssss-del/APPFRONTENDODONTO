@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { useApp } from '@/store';
+import { useApp } from '@/storeHooks';
 import { useEffect } from 'react';
 import { hasSeenTutorial } from './WelcomeTutorial';
 

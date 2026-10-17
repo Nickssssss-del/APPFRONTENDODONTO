@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { LogOut, Phone, Check } from 'lucide-react';
 import { Button, Input } from '@/components/ui';
-import { useApp } from '@/store';
+import { useApp } from '@/storeHooks';
 import { ApiError } from '@/api/http';
 import { actualizarYo } from '@/api/usuarios';
 

@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { useApp } from '../store';
+import { useApp } from '@/storeHooks';
 import {
   Home, Calendar, MessageCircle, Bell, User,
 } from 'lucide-react';
