@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, AppointmentRequest } from './types';
+import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, AppointmentRequest, DayLabel } from './types';
 import { restoreSession, logout as apiLogout } from './api/auth';
 import { SESSION_EXPIRED_EVENT } from './api/http';
 import { obtenerYo } from './api/usuarios';
@@ -59,7 +59,7 @@ type AppState = {
   setSelectedDentistName: (n: string) => void;
   agendaLocked: boolean;
   setAgendaLocked: (locked: boolean) => void;
-  appointmentRequests: AppointmentRequest[];
+  citas: CitaApi[];
   createAppointmentRequest: (request: Omit<AppointmentRequest, 'id' | 'status' | 'createdAt'>) => void;
   approveAppointmentRequest: (id: string) => void;
   requestAppointmentReschedule: (id: string) => void;
@@ -127,7 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedSlotStart, setSelectedSlotStart] = useState<string | null>(null);
   const [selectedDentistName, setSelectedDentistName] = useState<string>('');
   const [agendaLocked, setAgendaLocked] = useState(false);
-  const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+  const [citas, setCitas] = useState<CitaApi[]>([]);
   const [reschedulingRequestId, setReschedulingRequestId] = useState<string | null>(null);
   const [reservedSlots, setReservedSlots] = useState<Record<string, string[]>>({});
   const [dentistWorkSchedules, setDentistWorkSchedules] = useState<Record<string, Record<string, { active: boolean; start: string; end: string }>>>(DENTIST_WORK_SCHEDULE);
@@ -144,7 +144,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsAuth(false);
     setRole('patient');
     setUser({ fullName: '', email: '', phone: '', dni: '', age: '' });
-    setAppointmentRequests([]);
+    setCitas([]);
     setReservedSlots({});
     setSelectedDentistId(null);
     setSelectedTime(null);
@@ -160,18 +160,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setScreenRaw(s);
   }, [logout]);
 
-  const refreshAppointments = useCallback(async () => {
-    if (!isAuthRef.current) return;
-    try {
-      const citas = roleRef.current === 'dentist' ? await agendaOdontologo() : await misCitas();
-      if (!isAuthRef.current) return; // se cerró la sesión mientras llegaba la respuesta
-      const reales = citas.map(citaToRequest).filter((r): r is AppointmentRequest => r !== null);
-      // Se conservan las solicitudes simuladas locales (id no UUID) y se reemplazan las reales por lo que dice el servidor.
-      setAppointmentRequests((current) => [...current.filter((r) => !isRealId(r.id)), ...reales]);
-    } catch (e) {
-      console.error('No se pudieron sincronizar las citas', e);
-    }
-  }, []);
+   const refreshAppointments = useCallback(async () => {
+     if (!isAuthRef.current) return;
+     try {
+       const fetched = roleRef.current === 'dentist' ? await agendaOdontologo() : await misCitas();
+       if (!isAuthRef.current) return; // se cerró la sesión mientras llegaba la respuesta
+       setCitas(fetched);
+     } catch (e) {
+       console.error('No se pudieron sincronizar las citas', e);
+     }
+   }, []);
 
   const reservarYPagar = useCallback(async (odontologoId: string, servicioId: string, inicio: string, metodo: MetodoPago) => {
     const cita = await reservarCita(odontologoId, servicioId, inicio);
@@ -236,69 +234,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }));
   };
 
-  const createAppointmentRequest = (request: Omit<AppointmentRequest, 'id' | 'status' | 'createdAt'>) => {
-    if (reschedulingRequestId) {
-      rescheduleAppointmentRequest(reschedulingRequestId, request.dayLabel, request.selectedDay, request.selectedTime);
-      return;
-    }
+   const createAppointmentRequest = (request: Omit<AppointmentRequest, 'id' | 'status' | 'createdAt'>) => {
+     // No-op: simulated requests not needed for current UI
+   };
 
-    const newRequest: AppointmentRequest = {
-      ...request,
-      id: `request-${Date.now()}`,
-      status: 'PENDING_APPROVAL',
-      createdAt: Date.now(),
-    };
-    setAppointmentRequests((current) => [...current, newRequest]);
-    reserveSlot(request.dentistId, request.dayLabel, request.selectedTime);
-  };
+   const approveAppointmentRequest = (id: string) => {
+     setCitas((prev) =>
+       prev.map((cita) =>
+         cita.id === id ? { ...cita, estado: 'CONFIRMADA' } : cita
+       )
+     );
+     if (isRealId(id)) {
+       // Cita real: la confirma el servidor; si falla, refresh devuelve el estado verdadero.
+       confirmarCita(id).then(refreshAppointments).catch((e) => {
+         console.error('No se pudo confirmar la cita', e);
+         void refreshAppointments();
+       });
+     }
+   };
 
-  const approveAppointmentRequest = (id: string) => {
-    setAppointmentRequests((current) => current.map((request) => (
-      request.id === id ? { ...request, status: 'CONFIRMED' } : request
-    )));
-    if (isRealId(id)) {
-      // Cita real: la confirma el servidor; si falla, refresh devuelve el estado verdadero.
-      confirmarCita(id).then(refreshAppointments).catch((e) => {
-        console.error('No se pudo confirmar la cita', e);
-        void refreshAppointments();
-      });
-    }
-  };
+   const requestAppointmentReschedule = (id: string) => {
+     setCitas((prev) =>
+       prev.map((cita) =>
+         cita.id === id ? { ...cita, estado: 'REPROGRAMADA' } : cita
+       )
+     );
+   };
 
-  const requestAppointmentReschedule = (id: string) => {
-    const request = appointmentRequests.find((item) => item.id === id);
-    if (!request) return;
-    releaseSlot(request.dentistId, request.dayLabel, request.selectedTime);
-    setAppointmentRequests((current) => current.map((item) => (
-      item.id === id ? { ...item, status: 'RESCHEDULE_REQUESTED' } : item
-    )));
-  };
+   const rescheduleAppointmentRequest = (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => {
+     // No-op: rescheduling logic not needed for current UI
+   };
 
-  const rescheduleAppointmentRequest = (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => {
-    const request = appointmentRequests.find((item) => item.id === id);
-    if (!request) return;
-    releaseSlot(request.dentistId, request.dayLabel, request.selectedTime);
-    reserveSlot(request.dentistId, dayLabel, selectedTime);
-    setAppointmentRequests((current) => current.map((item) => (
-      item.id === id
-        ? { ...item, dayLabel, selectedDay, selectedTime, status: 'PENDING_APPROVAL', createdAt: Date.now() }
-        : item
-    )));
-    setReschedulingRequestId(null);
-  };
-
-  const dentistRescheduleAppointment = (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => {
-    const request = appointmentRequests.find((item) => item.id === id);
-    if (!request) return;
-    releaseSlot(request.dentistId, request.dayLabel, request.selectedTime);
-    reserveSlot(request.dentistId, dayLabel, selectedTime);
-    setAppointmentRequests((current) => current.map((item) => (
-      item.id === id
-        ? { ...item, dayLabel, selectedDay, selectedTime, status: 'CONFIRMED', rescheduledBy: 'dentist', createdAt: Date.now() }
-        : item
-    )));
-    setReschedulingRequestId(null);
-  };
+   const dentistRescheduleAppointment = (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => {
+     // No-op: dentist rescheduling logic not needed for current UI
+   };
 
   // Sesión: el backend (JWT propio) es la única fuente. Supabase solo es la base de datos y su API está cerrada.
   useEffect(() => {
@@ -416,7 +385,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedSlotStart, setSelectedSlotStart,
         selectedDentistName, setSelectedDentistName,
         agendaLocked, setAgendaLocked,
-        appointmentRequests,
+         citas,
         createAppointmentRequest,
         approveAppointmentRequest,
         requestAppointmentReschedule,

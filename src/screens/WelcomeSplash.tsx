@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useApp } from '../store';
+import { useApp } from '@/storeHooks';
 import { ArrowRight, CheckCircle2 } from 'lucide-react';
 import { Button } from '../components/ui';
 
