@@ -15,15 +15,13 @@ export type Screen =
   | 'patientProfile'
   | 'confirmarCita';
 
-export type DayLabel = 'Lun' | 'Mar' | 'Mié' | 'Jue' | 'Vie' | 'Sáb' | 'Dom';
-
 export type Treatment = {
   id: string;
   name: string;
   price: number;
   description: string;
   duration: number;
-  /** monto_deposito que calcula el backend (solo servicios reales). */
+  /** monto_deposito que calcula el backend. */
   deposit?: number;
 };
 
@@ -55,20 +53,53 @@ export type ChatMessage = {
   timestamp: number;
 };
 
-export type Appointment = {
-  time: string;
-  doctor: string;
-  treatment: string;
-  date: string;
-  guaranteePaid: boolean;
-};
-
 export type Reservation = {
   treatment: Treatment;
   selectedDay: string;
   selectedTime: string;
   paymentMethod: PaymentMethod;
   operationNumber?: string;
+};
+
+export type UserProfile = {
+  fullName: string;
+  email: string;
+  phone: string;
+  dni: string;
+  age: string;
+  /** foto_perfil_url de GET /api/usuarios/yo */
+  photoUrl?: string;
+};
+
+export type DentistLocation = {
+  id: string;
+  name: string;
+  specialty: string;
+  rating: number;
+  reviews: number;
+  cop: string;
+  address: string;
+  /** distrito_consultorio de la BD; úsalo en vez de parsear `address`. */
+  district?: string;
+  lat: number;
+  lng: number;
+  image: string;
+  price: number;
+};
+
+export type RecoverMethod = 'email' | 'phone';
+
+export type DayLabel = 'Lun' | 'Mar' | 'Mié' | 'Jue' | 'Vie' | 'Sáb' | 'Dom';
+
+export type DentistTab = 'dashboard' | 'agenda' | 'patients' | 'history';
+
+export type SessionInfo = {
+  user: { id: string; email?: string };
+};
+
+export type SessionState = {
+  loading: boolean;
+  session: SessionInfo | null;
 };
 
 export type AppointmentRequestStatus = 'PENDING_APPROVAL' | 'CONFIRMED' | 'RESCHEDULE_REQUESTED';
@@ -88,140 +119,4 @@ export type AppointmentRequest = {
   status: AppointmentRequestStatus;
   createdAt: number;
   rescheduledBy?: 'dentist';
-};
-
-export type UserProfile = {
-  fullName: string;
-  email: string;
-  phone: string;
-  dni: string;
-  age: string;
-};
-
-export type DentistLocation = {
-  id: string;
-  name: string;
-  specialty: string;
-  rating: number;
-  reviews: number;
-  cop: string;
-  address: string;
-  /** distrito_consultorio de la BD; úsalo en vez de parsear `address`. */
-  district?: string;
-  lat: number;
-  lng: number;
-  image: string;
-  price: number;
-};
-
-export type PatientRecord = {
-  id: string;
-  name: string;
-  dni: string;
-  age: string;
-  lastVisit: string;
-  treatment: string;
-  status: 'completed' | 'upcoming' | 'cancelled';
-  hasOdontogram: boolean;
-};
-
-export type RecoverMethod = 'email' | 'phone';
-
-// ---- Dentist module types ----
-
-export type DentistTab = 'dashboard' | 'agenda' | 'patients' | 'history';
-
-export type AppointmentStatus = 'PENDING_PAYMENT' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED';
-
-export type AgendaPatient = {
-  id: string;
-  name: string;
-  dni: string;
-  age: string;
-  time: string;
-  treatment: string;
-  status: AppointmentStatus;
-  guaranteePaid: boolean;
-  photo: string;
-  phone: string;
-  email: string;
-  whatsapp: string;
-};
-
-export type ClinicalEntry = {
-  id: string;
-  date: string;
-  time: string;
-  type: 'evolution' | 'odontogram' | 'xray' | 'tomography' | 'prescription';
-  title: string;
-  description: string;
-  attachments: string[];
-};
-
-export type DentistProfile = {
-  fullName: string;
-  specialty: string;
-  cop: string;
-  ruc: string;
-  email: string;
-  phone: string;
-  photo: string;
-  clinicPhotos: string[];
-  workDays: Record<DayLabel, { active: boolean; start: string; end: string }>;
-};
-
-export type ConfirmedAppointment = {
-  dentistId: string;
-  dayLabel: DayLabel;
-  start: string;
-  duration: number;
-};
-
-export type AppointmentSlot = ConfirmedAppointment & {
-  end: string;
-  available: boolean;
-};
-
-export type SessionInfo = {
-  user: { id: string; email?: string };
-};
-
-export type SessionState = {
-  loading: boolean;
-  session: SessionInfo | null;
-};
-
-export type PatientViewMode = 'day' | 'week';
-
-export type WeekDayData = {
-  day: string;
-  date: string;
-  patients: AgendaPatient[];
-};
-
-export type CalendarView = 'day' | 'week' | 'month';
-
-export type DaySchedule = {
-  dayLabel: string;
-  dateNumber: string;
-  fullDate: string;
-  patients: AgendaPatient[];
-};
-
-export type MonthSchedule = {
-  dayLabel: string;
-  dateNumber: string;
-  appointmentCount: number;
-};
-
-export type PatientClinicalRecord = {
-  id: string;
-  name: string;
-  dni: string;
-  age: string;
-  photo: string;
-  totalVisits: number;
-  lastVisit: string;
-  currentTreatment: string;
-  history: ClinicalEntry[];
 };

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Mail, Lock, Eye, EyeOff, Shield, ArrowRight, User, Stethoscope, Phone, IdCard, Loader2, AlertCircle } from 'lucide-react';
-import { useApp } from '../store';
-import { login, register } from '@/api/auth';
+import { useApp } from '../storeHooks';
+import { login, register, loginConGoogle, recuperarPassword, restablecerPassword, type AuthSession } from '@/api/auth';
 import { ApiError } from '@/api/http';
+import GoogleButton from '../components/GoogleButton';
+import { Modal, Button } from '../components/ui';
 
 export default function Onboarding() {
   const { setScreen, setUser, setRole: setAppRole, setIsAuth, user } = useApp();
@@ -21,16 +23,139 @@ export default function Onboarding() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [acceptPrivacy, setAcceptPrivacy] = useState(false);
+  // Olvidé mi contraseña: 'correo' (pedir código) → 'codigo' (código + contraseña nueva) → 'listo'
+  const [recovery, setRecovery] = useState<null | 'correo' | 'codigo' | 'listo'>(null);
+  const [recCorreo, setRecCorreo] = useState('');
+  const [recCodigo, setRecCodigo] = useState('');
+  const [recPass, setRecPass] = useState('');
+  const [recMsg, setRecMsg] = useState<string | null>(null);
+  const [recBusy, setRecBusy] = useState(false);
+  // Cuenta de Google nueva: falta documento, teléfono y rol antes de crear la cuenta.
+  const [googlePending, setGooglePending] = useState<{ idToken: string; correo: string; nombre: string } | null>(null);
+
+  /** Deja la app lista tras un login/registro exitoso (el rol real lo manda el servidor, no el selector). */
+  const entrar = async (session: AuthSession) => {
+    const realRole = session.rol === 'ODONTOLOGO' ? 'dentist' : 'patient';
+    setAppRole(realRole);
+    setUser({ ...user, fullName: session.nombreCompleto, email: email.trim() });
+    setIsAuth(true);
+    setScreen(realRole === 'patient' ? 'patientDashboard' : 'dentistPanel');
+    // El store carga el perfil completo (documento, teléfono) con /api/usuarios/yo al abrirse la sesión.
+  };
+
+  const rolBackend = role === 'dentist' ? 'ODONTOLOGO' : 'PACIENTE';
+
+  const abrirRecuperacion = () => {
+    setRecCorreo(email.trim());
+    setRecCodigo('');
+    setRecPass('');
+    setRecMsg(null);
+    setRecovery('correo');
+  };
+
+  const pedirCodigo = async () => {
+    if (recBusy) return;
+    const correo = recCorreo.trim();
+    if (!correo) return setRecMsg('Ingresa tu correo.');
+    setRecBusy(true);
+    setRecMsg(null);
+    try {
+      await recuperarPassword(correo); // 202 siempre: no revela si el correo existe
+      setRecovery('codigo');
+    } catch (err) {
+      setRecMsg(err instanceof ApiError ? err.message : 'No se pudo enviar el código.');
+    } finally {
+      setRecBusy(false);
+    }
+  };
+
+  const cambiarPassword = async () => {
+    if (recBusy) return;
+    if (!/^\d{6}$/.test(recCodigo)) return setRecMsg('El código tiene 6 dígitos.');
+    if (recPass.length < 8) return setRecMsg('La contraseña debe tener al menos 8 caracteres.');
+    setRecBusy(true);
+    setRecMsg(null);
+    try {
+      await restablecerPassword(recCorreo.trim(), recCodigo, recPass);
+      setEmail(recCorreo.trim());
+      setPassword('');
+      setRecovery('listo');
+    } catch (err) {
+      setRecMsg(err instanceof ApiError ? err.message : 'No se pudo cambiar la contraseña.');
+    } finally {
+      setRecBusy(false);
+    }
+  };
+
+  const validarDatosExtra = (): string | null => {
+    if (!docNumber.trim() || !phone.trim()) return 'Completa tu documento y teléfono.';
+    if (role === 'dentist' && !copNumber.trim()) return 'Ingresa tu número de colegiatura COP.';
+    if (!acceptPrivacy) return 'Debes aceptar la política de privacidad para continuar.';
+    return null;
+  };
+
+  const handleGoogleCredential = async (idToken: string) => {
+    if (loading) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const r = await loginConGoogle(idToken);
+      if (r.estado === 'sesion') {
+        await entrar(r.sesion);
+      } else {
+        setGooglePending({ idToken, correo: r.correo, nombre: r.nombreCompleto });
+        setIsRegister(true);
+      }
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 404 || err.status === 503)) {
+        setError('El inicio con Google todavía no está disponible. Usa tu correo y contraseña.');
+      } else {
+        setError(err instanceof ApiError ? err.message : 'No se pudo iniciar sesión con Google.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
     setError(null);
 
+    if (googlePending) {
+      const falta = validarDatosExtra();
+      if (falta) return setError(falta);
+      setLoading(true);
+      try {
+        const r = await loginConGoogle(googlePending.idToken, {
+          rol: rolBackend,
+          tipoDocumento: docType,
+          numeroDocumento: docNumber.trim(),
+          telefono: phone.trim(),
+          numeroColegiatura: role === 'dentist' ? copNumber.trim() : undefined,
+          aceptaPrivacidad: true,
+        });
+        if (r.estado === 'sesion') await entrar(r.sesion);
+        else setError('No pudimos completar tu registro con Google. Inténtalo de nuevo.');
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          setGooglePending(null);
+          setError('Tu sesión de Google venció. Pulsa «Continuar con Google» otra vez.');
+        } else {
+          setError(err instanceof ApiError ? err.message : 'No se pudo completar la solicitud.');
+        }
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (isRegister) {
       if (password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
-      if (!fullName.trim() || !docNumber.trim() || !phone.trim()) return setError('Completa todos tus datos.');
-      if (role === 'dentist' && !copNumber.trim()) return setError('Ingresa tu número de colegiatura COP.');
+      if (!fullName.trim()) return setError('Completa tus datos.');
+      const falta = validarDatosExtra();
+      if (falta) return setError(falta);
     }
 
     setLoading(true);
@@ -43,17 +168,12 @@ export default function Onboarding() {
             telefono: phone.trim(),
             correo: email.trim(),
             password,
-            rol: role === 'dentist' ? 'ODONTOLOGO' : 'PACIENTE',
+            rol: rolBackend,
             numeroColegiatura: role === 'dentist' ? copNumber.trim() : undefined,
+            aceptaPrivacidad: true,
           })
         : await login(email.trim(), password);
-
-      // El rol real lo manda el servidor (no el selector): una cuenta de paciente no entra como odontólogo.
-      const realRole = session.rol === 'ODONTOLOGO' ? 'dentist' : 'patient';
-      setAppRole(realRole);
-      setUser({ ...user, fullName: session.nombreCompleto, email: email.trim(), ...(isRegister ? { dni: docNumber.trim(), phone: phone.trim() } : {}) });
-      setIsAuth(true);
-      setScreen(realRole === 'patient' ? 'patientDashboard' : 'dentistPanel');
+      await entrar(session);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'No se pudo completar la solicitud.');
     } finally {
@@ -86,10 +206,12 @@ export default function Onboarding() {
         <div className="bg-white rounded-3xl p-6 border border-slatey-100 shadow-xl shadow-slatey-200/50 space-y-6">
           <div>
             <h2 className="text-2xl font-black text-slatey-900 font-display">
-              {isRegister ? 'Crea tu cuenta' : 'Inicia sesión'}
+              {googlePending ? 'Completa tu perfil' : isRegister ? 'Crea tu cuenta' : 'Inicia sesión'}
             </h2>
             <p className="text-xs text-slatey-500 mt-1">
-              {isRegister
+              {googlePending
+                ? `Hola${googlePending.nombre ? `, ${googlePending.nombre}` : ''}. Necesitamos unos datos más para crear tu cuenta.`
+                : isRegister
                 ? 'Regístrate para reservar o gestionar consultas'
                 : 'Ingresa tus credenciales para continuar'}
             </p>
@@ -125,7 +247,7 @@ export default function Onboarding() {
 
           {/* Formulario */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isRegister && (
+            {isRegister && !googlePending && (
               <div className="space-y-1">
                 <label className="text-xs font-bold text-slatey-700 block">Nombre Completo</label>
                 <div className="relative">
@@ -189,6 +311,7 @@ export default function Onboarding() {
               </>
             )}
 
+            {!googlePending && (<>
             <div className="space-y-1">
               <label className="text-xs font-bold text-slatey-700 block">Correo electrónico</label>
               <div className="relative">
@@ -223,6 +346,7 @@ export default function Onboarding() {
                 </button>
               </div>
             </div>
+            </>)}
 
             {/* Campo N.º de Colegiatura COP (Solo cuando Soy Odontólogo está activo) */}
             {role === 'dentist' && (
@@ -249,13 +373,25 @@ export default function Onboarding() {
               </motion.div>
             )}
 
+            {isRegister && (
+              <label className="flex items-start gap-2.5 cursor-pointer text-xs text-slatey-600 font-medium leading-relaxed">
+                <input
+                  type="checkbox"
+                  checked={acceptPrivacy}
+                  onChange={(e) => setAcceptPrivacy(e.target.checked)}
+                  className="mt-0.5 rounded border-slatey-300 text-primary-500 focus:ring-primary-400"
+                />
+                <span>Acepto la política de privacidad y el tratamiento de mis datos personales (Ley 29733).</span>
+              </label>
+            )}
+
             {!isRegister && (
               <div className="flex items-center justify-between text-xs pt-1">
                 <label className="flex items-center gap-2 cursor-pointer text-slatey-600 font-medium">
                   <input type="checkbox" className="rounded border-slatey-300 text-primary-500 focus:ring-primary-400" />
                   Recordarme
                 </label>
-                <button type="button" className="text-primary-600 font-bold hover:underline">
+                <button type="button" onClick={abrirRecuperacion} className="text-primary-600 font-bold hover:underline">
                   ¿Olvidaste tu contraseña?
                 </button>
               </div>
@@ -270,49 +406,38 @@ export default function Onboarding() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (isRegister && !acceptPrivacy)}
               className="disabled:opacity-60 w-full py-3.5 px-4 rounded-2xl bg-primary-500 hover:bg-primary-600 text-white font-bold text-sm shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2 active:scale-98 transition-all mt-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-              {isRegister ? 'Registrarse' : 'Iniciar sesión'}
+              {googlePending ? 'Crear mi cuenta' : isRegister ? 'Registrarse' : 'Iniciar sesión'}
               {!loading && <ArrowRight className="w-4 h-4" />}
             </button>
           </form>
 
-          {/* Social / Divider */}
-          <div className="relative py-2">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slatey-100" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="bg-white px-3 text-slatey-400">o</span>
-            </div>
-          </div>
+          {googlePending ? (
+            <button
+              type="button"
+              onClick={() => { setGooglePending(null); setIsRegister(false); setError(null); }}
+              className="w-full text-center text-xs font-bold text-slatey-500 hover:text-slatey-700"
+            >
+              Cancelar y volver
+            </button>
+          ) : (
+            <>
+              {/* Social / Divider */}
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slatey-100" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-3 text-slatey-400">o</span>
+                </div>
+              </div>
 
-          <button
-            type="button"
-            className="w-full py-3 px-4 rounded-2xl bg-white border border-slatey-200 text-slatey-700 font-bold text-xs flex items-center justify-center gap-2 hover:bg-slatey-50 transition-colors shadow-2xs"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
-              <path
-                fill="#4285F4"
-                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-              />
-              <path
-                fill="#34A853"
-                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-              />
-              <path
-                fill="#FBBC05"
-                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-              />
-              <path
-                fill="#EA4335"
-                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-              />
-            </svg>
-            Continuar con Google
-          </button>
+              <GoogleButton onCredential={handleGoogleCredential} disabled={loading} />
+            </>
+          )}
 
           {/* Switch Register/Login */}
           <p className="text-center text-xs text-slatey-500 pt-2">
@@ -327,6 +452,59 @@ export default function Onboarding() {
           </p>
         </div>
       </div>
+
+      <Modal
+        open={recovery !== null}
+        onClose={() => !recBusy && setRecovery(null)}
+        title={recovery === 'listo' ? 'Contraseña actualizada' : 'Recuperar contraseña'}
+      >
+        <div className="space-y-4">
+          {recovery === 'correo' && (
+            <>
+              <p className="text-sm text-slatey-600">Te enviaremos un código de 6 dígitos a tu correo. Vale 15 minutos.</p>
+              <input
+                type="email"
+                value={recCorreo}
+                onChange={(e) => setRecCorreo(e.target.value)}
+                placeholder="tucorreo@gmail.com"
+                className="w-full px-4 py-3 rounded-2xl bg-slatey-50 border border-slatey-200 text-slatey-900 placeholder:text-slatey-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
+              />
+            </>
+          )}
+          {recovery === 'codigo' && (
+            <>
+              <p className="text-sm text-slatey-600">
+                Si <strong>{recCorreo}</strong> tiene una cuenta, te enviamos un código. Revisa también la carpeta de spam.
+              </p>
+              <input
+                inputMode="numeric"
+                maxLength={6}
+                value={recCodigo}
+                onChange={(e) => setRecCodigo(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Código de 6 dígitos"
+                className="w-full px-4 py-3 rounded-2xl bg-slatey-50 border border-slatey-200 text-slatey-900 tracking-widest placeholder:tracking-normal placeholder:text-slatey-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
+              />
+              <input
+                type="password"
+                value={recPass}
+                onChange={(e) => setRecPass(e.target.value)}
+                placeholder="Contraseña nueva (mín. 8 caracteres)"
+                className="w-full px-4 py-3 rounded-2xl bg-slatey-50 border border-slatey-200 text-slatey-900 placeholder:text-slatey-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
+              />
+              <button type="button" onClick={pedirCodigo} disabled={recBusy} className="text-xs font-bold text-primary-600 hover:underline disabled:opacity-50">
+                Reenviar código (puedes pedir uno cada 60 s)
+              </button>
+            </>
+          )}
+          {recovery === 'listo' && (
+            <p className="text-sm text-slatey-600">Cambiaste tu contraseña y cerramos tus otras sesiones. Ya puedes iniciar sesión.</p>
+          )}
+          {recMsg && <p role="alert" className="text-xs font-semibold text-error-600">{recMsg}</p>}
+          {recovery === 'correo' && <Button fullWidth size="lg" loading={recBusy} onClick={pedirCodigo}>Enviar código</Button>}
+          {recovery === 'codigo' && <Button fullWidth size="lg" loading={recBusy} onClick={cambiarPassword}>Cambiar contraseña</Button>}
+          {recovery === 'listo' && <Button fullWidth size="lg" onClick={() => setRecovery(null)}>Iniciar sesión</Button>}
+        </div>
+      </Modal>
     </div>
   );
 }

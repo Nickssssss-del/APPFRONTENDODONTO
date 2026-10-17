@@ -3,7 +3,6 @@ import type { ProfileTab } from './types';
 const TABS: { id: ProfileTab; label: string; emoji: string }[] = [
   { id: 'resumen',      label: 'Resumen',      emoji: '🏠' },
   { id: 'historial',   label: 'Historial',    emoji: '📋' },
-  { id: 'odontograma', label: 'Odontograma',  emoji: '🦷' },
   { id: 'comprobantes',label: 'Comprobantes', emoji: '🧾' },
 ];
 

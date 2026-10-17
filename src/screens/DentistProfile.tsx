@@ -1,236 +1,141 @@
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import {
-  MapPin, Star, Lock, FileText, AlertCircle, MessageCircle,
-  Settings, Calendar, Upload, ArrowRight, CheckCircle2, Sofa,
-  Navigation, X, BadgeCheck, Stethoscope, Phone, Mail,
-  User as UserIcon, Clock, RotateCcw,
-} from 'lucide-react';
-import { useApp } from '@/store';
+import { ArrowLeft, ArrowRight, BadgeCheck, Building2, Clock, Loader2, MapPin, Star, AlertCircle, Stethoscope } from 'lucide-react';
+import { useApp } from '@/storeHooks';
 import { Button, Badge } from '@/components/ui';
-import type { DentistProfile } from '@/types';
+import SmartImage from '@/components/SmartImage';
+import { useAsync } from '@/hooks/useAsync';
+import { obtenerOdontologo } from '@/api/catalog';
+import { resenasDeOdontologo } from '@/api/panel';
+import { diaLima, soles } from '@/lib/format';
+import { DIAS_SEMANA } from '@/api/panel';
 
+const hhmm = (t: string) => t.slice(0, 5);
+
+/** Perfil público de un odontólogo: GET /api/odontologos/{id} y /api/odontologos/{id}/resenas. */
 export default function DentistProfile() {
-  const { setScreen, selectedDentistId, agendaLocked, user, setSettingsOpen } = useApp();
-  
-  // Mock dentist profile data - in a real app this would come from an API
-  const dentistProfiles: Record<string, DentistProfile> = {
-    '1': {
-      fullName: 'Dr. Carlos Mendoza',
-      specialty: 'Odontólogo General',
-      cop: 'COP 34512',
-      ruc: '10123456789',
-      email: 'carlos.mendoza@odontosystem.com',
-      phone: '999 888 777',
-      photo: 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-      clinicPhotos: [
-        'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-        'https://images.pexels.com/photos/614765/pexels-photo-614765.jpeg?auto=compress&cs=tinysrgb&h=120&w=120',
-        'https://images.pexels.com/photos/414622/pexels-photo-414622.jpeg?auto=compress&cs=tinysrgb&h=120&w=120'
-      ],
-      workDays: {
-        'Lun': { active: true, start: '08:00', end: '17:00' },
-        'Mar': { active: true, start: '08:00', end: '17:00' },
-        'Mié': { active: true, start: '08:00', end: '17:00' },
-        'Jue': { active: true, start: '08:00', end: '17:00' },
-        'Vie': { active: true, start: '08:00', end: '17:00' },
-        'Sáb': { active: true, start: '09:00', end: '14:00' },
-        'Dom': { active: false, start: '', end: '' }
-      }
-    },
-    '2': {
-      fullName: 'Dra. Patricia Ruiz',
-      specialty: 'Ortodoncista',
-      cop: 'COP 28765',
-      ruc: '10123456790',
-      email: 'patricia.ruiz@odontosystem.com',
-      phone: '998 777 666',
-      photo: 'https://images.pexels.com/photos/6812464/pexels-photo-6812464.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-      clinicPhotos: [
-        'https://images.pexels.com/photos/6812464/pexels-photo-6812464.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-        'https://images.pexels.com/photos/414622/pexels-photo-414622.jpeg?auto=compress&cs=tinysrgb&h=120&w=120'
-      ],
-      workDays: {
-        'Lun': { active: true, start: '09:00', end: '18:00' },
-        'Mar': { active: true, start: '09:00', end: '18:00' },
-        'Mié': { active: true, start: '09:00', end: '18:00' },
-        'Jue': { active: true, start: '09:00', end: '18:00' },
-        'Vie': { active: true, start: '09:00', end: '18:00' },
-        'Sáb': { active: false, start: '', end: '' },
-        'Dom': { active: false, start: '', end: '' }
-      }
-    },
-    '3': {
-      fullName: 'Dr. Miguel Torres',
-      specialty: 'Endodoncista',
-      cop: 'COP 45123',
-      ruc: '10123456791',
-      email: 'miguel.torres@odontosystem.com',
-      phone: '997 666 555',
-      photo: 'https://images.pexels.com/photos/37458054/pexels-photo-37458054.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-      clinicPhotos: [
-        'https://images.pexels.com/photos/37458054/pexels-photo-37458054.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-        'https://images.pexels.com/photos/297405/pexels-photo-297405.jpeg?auto=compress&cs=tinysrgb&h=120&w=120'
-      ],
-      workDays: {
-        'Lun': { active: true, start: '10:00', end: '19:00' },
-        'Mar': { active: true, start: '10:00', end: '19:00' },
-        'Mié': { active: true, start: '10:00', end: '19:00' },
-        'Jue': { active: true, start: '10:00', end: '19:00' },
-        'Vie': { active: true, start: '10:00', end: '19:00' },
-        'Sáb': { active: true, start: '10:00', end: '15:00' },
-        'Dom': { active: false, start: '', end: '' }
-      }
-    },
-    '4': {
-      fullName: 'Dra. Lucía Vargas',
-      specialty: 'Odontopediatra',
-      cop: 'COP 31234',
-      ruc: '10123456792',
-      email: 'lucia.vargas@odontosystem.com',
-      phone: '984 666 777',
-      photo: 'https://images.pexels.com/photos/32205053/pexels-photo-32205053.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-      clinicPhotos: [
-        'https://images.pexels.com/photos/32205053/pexels-photo-32205053.jpeg?auto=compress&cs=tinysrgb&h=200&w=200',
-        'https://images.pexels.com/photos/302579/pexels-photo-302579.jpeg?auto=compress&cs=tinysrgb&h=120&w=120'
-      ],
-      workDays: {
-        'Lun': { active: true, start: '08:00', end: '17:00' },
-        'Mar': { active: true, start: '08:00', end: '17:00' },
-        'Mié': { active: true, start: '08:00', end: '17:00' },
-        'Jue': { active: true, start: '08:00', end: '17:00' },
-        'Vie': { active: true, start: '08:00', end: '17:00' },
-        'Sáb': { active: true, start: '08:00', end: '13:00' },
-        'Dom': { active: false, start: '', end: '' }
-      }
-    }
-  };
+  const { setScreen, selectedDentistId, role, isAuth } = useApp();
+  const volver = () => setScreen(isAuth && role === 'patient' ? 'patientDashboard' : 'marketplace');
 
-  const getDentistProfile = (id: string): DentistProfile | null => {
-    return dentistProfiles[id] || null;
-  };
-
-  const handleBack = () => {
-    setScreen('patientDashboard');
-    // Clear the selected dentist when going back
-    // Note: We don't have a setter for selectedDentistId here, but we could add it if needed
-  };
-
-  const handleReserve = () => {
-    // Navigate to marketplace to book appointment
-    setScreen('marketplace');
-    // Clear the selected dentist ID as we're moving to a different flow
-    // In a real app, we might pass this as a parameter to the marketplace
-  };
-
-  const dentist = selectedDentistId ? getDentistProfile(selectedDentistId) : null;
+  const perfil = useAsync((signal) => (selectedDentistId ? obtenerOdontologo(selectedDentistId, signal) : Promise.reject(new Error('sin id'))), [selectedDentistId]);
+  const resenas = useAsync((signal) => (selectedDentistId ? resenasDeOdontologo(selectedDentistId, 0, signal) : Promise.resolve(null)), [selectedDentistId]);
+  const d = perfil.data;
 
   return (
     <div className="min-h-screen bg-slatey-50 pb-24">
-      {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
-        <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
-          <div className="flex items-center gap-3">
-            {dentist && (
-              <>
-                <img src={dentist.photo} alt={dentist.fullName} className="w-10 h-10 rounded-xl object-cover" />
-                <div>
-                  <h2 className="text-lg font-bold text-slatey-900 font-display leading-tight">{dentist.fullName}</h2>
-                  <p className="text-sm font-semibold text-slatey-600">{dentist.specialty}</p>
-                </div>
-              </>
-            )}
-          </div>
-          <button
-            onClick={handleBack}
-            className="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors"
-          >
-            <ArrowRight className="w-5 h-5 text-primary-600" rotate={180} />
+        <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
+          <button onClick={volver} aria-label="Volver" className="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors">
+            <ArrowLeft className="w-5 h-5 text-primary-600" />
           </button>
+          {d && (
+            <div className="flex items-center gap-3 min-w-0">
+              <SmartImage src={d.fotoUrl} alt={d.nombre} ratio="1/1" fallback="avatar" gravity="face" widths={[80, 160]} sizes="40px" className="w-10 h-10 rounded-xl flex-shrink-0" />
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-slatey-900 font-display leading-tight truncate">{d.nombre}</h2>
+                <p className="text-xs font-semibold text-slatey-600 truncate">{d.especialidades.map((e) => e.nombre).join(' · ') || 'Odontología general'}</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-8">
-        {!dentist ? (
-          <div className="text-center py-12">
-            <p className="text-sm text-slatey-500">Cargando perfil del dentista...</p>
+      <div className="max-w-md mx-auto px-4 py-6 space-y-7">
+        {perfil.loading && <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-primary-500 animate-spin" aria-label="Cargando perfil" /></div>}
+        {perfil.error && (
+          <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-slatey-100 bg-white p-8 text-center">
+            <AlertCircle className="w-7 h-7 text-accent-600" />
+            <p className="text-sm text-slatey-600">{selectedDentistId ? perfil.error : 'Elige un odontólogo para ver su perfil.'}</p>
+            {selectedDentistId && <Button size="sm" onClick={perfil.reload}>Reintentar</Button>}
           </div>
-        ) : (
+        )}
+
+        {d && (
           <>
-            {/* About Me / Description Section */}
-            <div className="mb-8">
-              <h3 className="text-sm font-bold text-slatey-900 mb-2">Sobre mí</h3>
-              <p className="text-slatey-600 leading-relaxed">
-                Soy un odontólogo apasionado por brindar la mejor atención dental a mis pacientes.
-                Con años de experiencia en el campo, me especializo en {dentist.specialty.toLowerCase()} 
-                y me esfuerzo por mantenerme actualizado con las últimas técnicas y tecnologías 
-                en odontología. Mi enfoque es siempre preventivo y personalizado para cada paciente.
-              </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {d.colegiaturaVerificada && <Badge variant="success" size="sm"><BadgeCheck className="w-3.5 h-3.5" /> COP {d.numeroColegiatura} verificado</Badge>}
+              {Number(d.totalResenas ?? 0) > 0 && (
+                <span className="flex items-center gap-1 text-xs font-bold text-slatey-900"><Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />{Number(d.calificacion ?? 0).toFixed(1)} <span className="font-normal text-slatey-400">({d.totalResenas} reseñas)</span></span>
+              )}
             </div>
 
-            {/* Clinic Photos */}
-            <div className="mb-8">
-              <h3 className="text-sm font-bold text-slatey-900 mb-2">Fotos del Consultorio</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {dentist.clinicPhotos.map((photo, index) => (
-                  <img
-                    key={index}
-                    src={photo}
-                    alt={`Consultorio ${index + 1}`}
-                    className="w-full h-48 rounded-xl object-cover"
-                  />
-                ))}
+            {(d.consultorio || d.direccion) && (
+              <div className="flex items-start gap-2.5 px-3 py-3 rounded-xl bg-white border border-slatey-100">
+                <Building2 className="w-4 h-4 text-slatey-500 shrink-0 mt-0.5" />
+                <div className="text-xs text-slatey-600">
+                  {d.consultorio && <p className="font-semibold text-slatey-900">{d.consultorio}</p>}
+                  <p className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {[d.direccion, d.distrito].filter(Boolean).join(', ')}</p>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Work Hours */}
-            <div className="mb-8">
-              <h3 className="text-sm font-bold text-slatey-900 mb-2">Horario de Atención</h3>
-              <div className="space-y-3">
-                {Object.entries(dentist.workDays).map(([day, schedule]) => (
-                  <div key={day} className="flex justify-between px-3 py-2 rounded-xl bg-slatey-50">
-                    <span className="font-medium text-slatey-700">{day}</span>
-                    {schedule.active ? (
-                      <span className="text-sm font-semibold text-slatey-900">
-                        {schedule.start} - {schedule.end}
+            <section>
+              <h3 className="text-sm font-bold text-slatey-900 mb-2">Servicios</h3>
+              {d.servicios.length === 0 ? <p className="text-xs text-slatey-500">Aún no publicó servicios.</p> : (
+                <div className="space-y-2">
+                  {d.servicios.map((s) => (
+                    <div key={s.id} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-white border border-slatey-100">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slatey-900 truncate"><Stethoscope className="w-3.5 h-3.5 inline mr-1 text-primary-500" />{s.titulo}</p>
+                        <p className="text-[11px] text-slatey-500">{s.categoria} · {s.duracionMinutos} min</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-bold text-slatey-900">{soles(s.precioTotal)}</p>
+                        <p className="text-[10px] text-slatey-400">Depósito {soles(s.montoDeposito)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {d.fotos.length > 0 && (
+              <section>
+                <h3 className="text-sm font-bold text-slatey-900 mb-2">Fotos del consultorio</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[...d.fotos].sort((a, b) => a.orden - b.orden).map((f, i) => (
+                    <SmartImage key={f.id} src={f.url} alt={f.descripcion ?? `Consultorio ${i + 1}`} ratio="4/3" fallback="clinic" widths={[320, 640]} sizes="50vw" className="rounded-xl" />
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <section>
+              <h3 className="text-sm font-bold text-slatey-900 mb-2 flex items-center gap-1.5"><Clock className="w-4 h-4 text-primary-500" /> Horario de atención</h3>
+              <div className="space-y-2">
+                {DIAS_SEMANA.map((dia) => {
+                  const tramos = d.horarios.filter((h) => h.diaSemana === dia.api);
+                  return (
+                    <div key={dia.api} className="flex justify-between px-3 py-2 rounded-xl bg-white border border-slatey-100">
+                      <span className="text-sm font-medium text-slatey-700">{dia.label}</span>
+                      <span className={`text-sm ${tramos.length ? 'font-semibold text-slatey-900' : 'text-slatey-500'}`}>
+                        {tramos.length ? tramos.map((t) => `${hhmm(t.horaInicio)} - ${hhmm(t.horaFin)}`).join(' · ') : 'Cerrado'}
                       </span>
-                    ) : (
-                      <span className="text-sm text-slatey-500">Cerrado</span>
-                    )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+
+            <section>
+              <h3 className="text-sm font-bold text-slatey-900 mb-2">Reseñas</h3>
+              {resenas.loading && <Loader2 className="w-5 h-5 text-primary-500 animate-spin" aria-label="Cargando reseñas" />}
+              {!resenas.loading && (resenas.data?.resenas ?? []).length === 0 && <p className="text-xs text-slatey-500">Todavía no tiene reseñas.</p>}
+              <div className="space-y-2">
+                {(resenas.data?.resenas ?? []).map((r) => (
+                  <div key={r.id} className="p-3 rounded-xl bg-white border border-slatey-100">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-slatey-900">{r.paciente}</p>
+                      <span className="flex items-center gap-0.5 text-xs font-bold text-slatey-900"><Star className="w-3 h-3 fill-amber-400 text-amber-400" />{r.calificacion}</span>
+                    </div>
+                    {r.comentario && <p className="text-xs text-slatey-600 mt-1 leading-relaxed">{r.comentario}</p>}
+                    <p className="text-[10px] text-slatey-400 mt-1">{diaLima(r.creadoEn)}</p>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
 
-            {/* Contact Info */}
-            <div className="mb-8">
-              <h3 className="text-sm font-bold text-slatey-900 mb-2">Información de Contacto</h3>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Phone className="w-4 h-4 text-slatey-500" />
-                  <span className="text-sm font-semibold text-slatey-900">{dentist.phone}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Mail className="w-4 h-4 text-slatey-500" />
-                  <span className="text-sm font-semibold text-slatey-900">{dentist.email}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <UserIcon className="w-4 h-4 text-slatey-500" />
-                  <span className="text-sm font-semibold text-slatey-900">{dentist.cop}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="space-y-4">
-              <Button fullWidth disabled={selectedDentistId === '1' && agendaLocked} onClick={handleReserve}>
-                {selectedDentistId === '1' && agendaLocked ? 'No disponible temporalmente' : 'Reservar Cita'}
-                {!(selectedDentistId === '1' && agendaLocked) && <ArrowRight className="w-4 h-4" />}
-              </Button>
-              <Button fullWidth variant="outline" onClick={handleBack}>
-                Regresar al Listado
-                <ArrowRight className="w-4 h-4" rotate={180} />
-              </Button>
+            <div className="space-y-3">
+              <Button fullWidth onClick={() => setScreen('marketplace')}>Reservar cita <ArrowRight className="w-4 h-4" /></Button>
+              <Button fullWidth variant="outline" onClick={volver}>Volver</Button>
             </div>
           </>
         )}

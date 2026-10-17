@@ -1,4 +1,4 @@
-import { type ButtonHTMLAttributes, type ReactNode, useEffect } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2 } from 'lucide-react';
 
@@ -10,7 +10,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
 };
 
-export function Button({
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   variant = 'primary',
   size = 'md',
   loading = false,
@@ -19,7 +19,7 @@ export function Button({
   className = '',
   disabled,
   ...props
-}: ButtonProps) {
+}, ref) {
   const variants = {
     primary: 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm shadow-primary-500/30',
     secondary: 'bg-slatey-900 text-white hover:bg-slatey-800',
@@ -35,6 +35,7 @@ export function Button({
   };
   return (
     <button
+      ref={ref}
       className={`inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
       disabled={disabled || loading}
       {...props}
@@ -43,7 +44,7 @@ export function Button({
       {children}
     </button>
   );
-}
+});
 
 type BadgeProps = {
   children: ReactNode;

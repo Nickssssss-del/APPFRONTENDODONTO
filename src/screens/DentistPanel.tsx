@@ -1,27 +1,26 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings, LayoutDashboard, Calendar, Users, FileText, Bot,
+  Settings, LayoutDashboard, Calendar, Users, UserCog, Bot,
 } from 'lucide-react';
-import { useApp } from '@/store';
+import { useApp } from '@/storeHooks';
 import type { DentistTab } from '@/types';
 import Dashboard from './dentist/Dashboard';
 import Agenda from './dentist/Agenda';
 import PatientDetail from './dentist/PatientDetail';
 import Patients from './dentist/Patients';
 import Profile from './dentist/Profile';
-
-const DOCTOR_AVATAR = 'https://images.pexels.com/photos/37458046/pexels-photo-37458046.jpeg?auto=compress&cs=tinysrgb&h=200&w=200';
-const DENTIST_NAME = 'Carlos Mendoza';
+import SmartImage from '@/components/SmartImage';
 
 const TABS: { id: DentistTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
   { id: 'agenda', label: 'Agenda', icon: Calendar },
   { id: 'patients', label: 'Pacientes', icon: Users },
-  { id: 'history', label: 'Historia', icon: FileText },
+  { id: 'history', label: 'Perfil', icon: UserCog },
 ];
 
 export default function DentistPanel() {
-  const { setSettingsOpen, dentistTab, setDentistTab, selectedPatientId, setSelectedPatientId } = useApp();
+  const { setScreen, setSettingsOpen, dentistTab, setDentistTab, selectedPatientId, setSelectedPatientId, user } = useApp();
+  const nombre = user.fullName;
 
   const handleGoToPatient = (id: string) => {
     setSelectedPatientId(id);
@@ -35,30 +34,19 @@ export default function DentistPanel() {
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
-          <div className="flex items-center gap-3">
-            <img src={DOCTOR_AVATAR} alt="Dr. Mendoza" className="w-10 h-10 rounded-xl object-cover" />
-            <div>
-              <h2 className="text-lg font-bold text-slatey-900 font-display leading-tight">Dr. {DENTIST_NAME}</h2>
+          <div className="flex items-center gap-3 min-w-0">
+            <SmartImage src={user.photoUrl} alt={nombre || 'Odontólogo'} ratio="1/1" fallback="avatar" gravity="face" widths={[80, 160]} sizes="40px" className="w-10 h-10 rounded-xl flex-shrink-0" />
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold text-slatey-900 font-display leading-tight truncate">{nombre ? `Dr/a. ${nombre}` : 'Mi consultorio'}</h2>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-2 h-2 rounded-full bg-success-500 animate-pulse" />
                 <span className="text-xs text-success-600 font-semibold">Sesión activa</span>
-</div>
-         </div>
-       )
-       {/* FAB for Chatbot */}
-       <button
-         onClick={() => setScreen('chatbot')}
-         className="fixed bottom-6 right-4 z-30 w-14 h-14 rounded-full bg-primary-500 shadow-xl shadow-primary-500/30 flex items-center justify-center hover:scale-105 transition-transform"
-         data-testid="dentist-chatbot-fab"
-       >
-         <Bot className="w-6 h-6 text-white" />
-         <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-error-500 text-white text-xs font-bold flex items-center justify-center border-2 border-white">
-           1
-         </span>
-       </button>
-     </div>
+              </div>
+            </div>
+          </div>
           <button
             onClick={() => setSettingsOpen(true)}
+            aria-label="Ajustes"
             className="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors"
           >
             <Settings className="w-5 h-5 text-primary-600" />
@@ -94,7 +82,7 @@ export default function DentistPanel() {
               transition={{ duration: 0.3 }}
             >
               {dentistTab === 'dashboard' && (
-                <Dashboard dentistName={DENTIST_NAME} onGoToAgenda={() => setDentistTab('agenda')} onGoToPatient={handleGoToPatient} />
+                <Dashboard dentistName={nombre} onGoToAgenda={() => setDentistTab('agenda')} onGoToPatient={handleGoToPatient} />
               )}
               {dentistTab === 'agenda' && <Agenda onGoToPatient={handleGoToPatient} />}
               {dentistTab === 'patients' && <Patients onGoToPatient={handleGoToPatient} />}
@@ -134,6 +122,15 @@ export default function DentistPanel() {
           </div>
         </div>
       )}
+      {/* Acceso al chatbot */}
+      <button
+        onClick={() => setScreen('chatbot')}
+        aria-label="Abrir OdontoBot"
+        className="fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full bg-primary-500 shadow-xl shadow-primary-500/30 flex items-center justify-center hover:scale-105 transition-transform"
+        data-testid="dentist-chatbot-fab"
+      >
+        <Bot className="w-6 h-6 text-white" />
+      </button>
     </div>
   );
 }

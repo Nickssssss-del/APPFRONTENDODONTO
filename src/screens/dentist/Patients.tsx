@@ -1,210 +1,113 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Phone, MessageCircle, ChevronRight, Calendar,
-  Users, XCircle,
-} from 'lucide-react';
-import { Badge } from '@/components/ui';
-import type { AgendaPatient, AppointmentStatus, PatientViewMode } from '@/types';
-import { WEEK_SCHEDULE } from '@/lib/dentistData';
+import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Phone, MessageCircle, ChevronRight, Users, Search, Loader2, AlertCircle, Calendar } from 'lucide-react';
+import { Badge, Button } from '@/components/ui';
+import { useAsync } from '@/hooks/useAsync';
+import { agendaOdontologo } from '@/api/citas';
+import { agruparPacientes, iniciales } from '@/lib/pacientes';
+import { diaLima, fechaIsoLima, horaLima, sumarDias } from '@/lib/format';
 
-const statusConfig: Record<AppointmentStatus, { label: string; variant: 'success' | 'primary' | 'warning' | 'error' | 'neutral' }> = {
-  CONFIRMED: { label: 'Confirmada', variant: 'success' },
-  PENDING_PAYMENT: { label: 'Pendiente', variant: 'warning' },
-  IN_PROGRESS: { label: 'En atención', variant: 'primary' },
-  COMPLETED: { label: 'Atendida', variant: 'neutral' },
-  NO_SHOW: { label: 'Inasistencia', variant: 'error' },
-  CANCELLED: { label: 'Cancelada', variant: 'error' },
-};
+const DIAS_ATRAS = 180;
+const DIAS_ADELANTE = 60;
 
 type PatientsProps = {
-  onGoToPatient: (id: string) => void;
+  onGoToPatient: (pacienteId: string) => void;
 };
 
 export default function Patients({ onGoToPatient }: PatientsProps) {
-  const [viewMode, setViewMode] = useState<PatientViewMode>('day');
-  const [selectedDayIdx, setSelectedDayIdx] = useState(0);
+  const [busqueda, setBusqueda] = useState('');
+  const hoy = useMemo(() => fechaIsoLima(new Date()), []);
+  // No existe un endpoint de pacientes: se arman con las citas de la agenda (hasta es exclusivo).
+  const agenda = useAsync(() => agendaOdontologo(sumarDias(hoy, -DIAS_ATRAS), sumarDias(hoy, DIAS_ADELANTE)), [hoy]);
 
-  const dayPatients = WEEK_SCHEDULE[selectedDayIdx]?.patients ?? [];
+  const pacientes = useMemo(() => agruparPacientes(agenda.data ?? []), [agenda.data]);
+  const visibles = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    return q ? pacientes.filter((p) => p.nombre.toLowerCase().includes(q) || (p.correo ?? '').toLowerCase().includes(q)) : pacientes;
+  }, [pacientes, busqueda]);
 
   return (
     <div className="space-y-4">
-      {/* Tab Switcher */}
-      <div className="bg-slatey-100 rounded-2xl p-1.5 flex gap-1">
-        {([
-          { id: 'day' as const, label: 'Por Día' },
-          { id: 'week' as const, label: 'Por Semana' },
-        ]).map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setViewMode(tab.id)}
-            className="relative flex-1 py-2.5 text-sm font-semibold rounded-xl transition-colors"
-          >
-            {viewMode === tab.id && (
-              <motion.div
-                layoutId="patientsTabBg"
-                className="absolute inset-0 bg-white rounded-xl shadow-sm"
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              />
-            )}
-            <span className={`relative z-10 ${viewMode === tab.id ? 'text-primary-600' : 'text-slatey-500'}`}>
-              {tab.label}
-            </span>
-          </button>
-        ))}
+      <div className="relative">
+        <Search className="w-4 h-4 text-slatey-400 absolute left-4 top-1/2 -translate-y-1/2" />
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar paciente por nombre o correo"
+          aria-label="Buscar paciente"
+          className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slatey-200 bg-white text-sm focus:border-primary-400 focus:outline-none"
+        />
       </div>
 
-      {/* Day selector for day view */}
-      {viewMode === 'day' && (
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
-          {WEEK_SCHEDULE.map((d, i) => {
-            const active = selectedDayIdx === i;
-            return (
-              <button
-                key={i}
-                onClick={() => setSelectedDayIdx(i)}
-                className={`flex-shrink-0 flex flex-col items-center gap-0.5 px-4 py-2.5 rounded-xl border-2 transition-all min-w-[56px] ${
-                  active ? 'border-primary-500 bg-primary-500 text-white' : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'
-                }`}
-              >
-                <span className="text-[10px] font-semibold">{d.dayLabel}</span>
-                <span className="text-sm font-extrabold">{d.dateNumber}</span>
-              </button>
-            );
-          })}
+      <div className="flex items-center justify-between px-1">
+        <h3 className="text-sm font-bold text-slatey-900">Mis pacientes</h3>
+        <Badge variant="primary" size="sm"><Users className="w-3 h-3" /> {pacientes.length}</Badge>
+      </div>
+
+      {agenda.loading && (
+        <div className="flex justify-center py-10" aria-busy="true">
+          <Loader2 className="w-6 h-6 text-primary-500 animate-spin" aria-label="Cargando pacientes" />
+        </div>
+      )}
+      {!agenda.loading && agenda.error && (
+        <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-slatey-100 bg-white p-8 text-center">
+          <AlertCircle className="w-7 h-7 text-accent-600" />
+          <p className="text-sm text-slatey-600">{agenda.error}</p>
+          <Button size="sm" onClick={agenda.reload}>Reintentar</Button>
+        </div>
+      )}
+      {!agenda.loading && !agenda.error && visibles.length === 0 && (
+        <div className="rounded-2xl border border-dashed border-slatey-200 bg-white p-8 text-center">
+          <p className="text-sm font-bold text-slatey-900">{pacientes.length === 0 ? 'Aún no tienes pacientes' : 'Sin resultados'}</p>
+          <p className="text-xs text-slatey-500 mt-1">
+            {pacientes.length === 0 ? 'Los pacientes con una cita pagada aparecerán aquí.' : 'Prueba con otro nombre.'}
+          </p>
         </div>
       )}
 
-      <AnimatePresence mode="wait">
-        {viewMode === 'day' ? (
-          <motion.div key="day" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
-            <div className="flex items-center justify-between px-1 mb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slatey-900">{WEEK_SCHEDULE[selectedDayIdx].fullDate}</h3>
-                <p className="text-xs text-slatey-500">{dayPatients.length} {dayPatients.length === 1 ? 'paciente' : 'pacientes'}</p>
-              </div>
-              <Badge variant="primary" size="sm">
-                <Users className="w-3 h-3" /> {dayPatients.length}
-              </Badge>
-            </div>
-            <div className="space-y-2">
-              {dayPatients.length > 0 ? (
-                dayPatients.map((p, i) => (
-                  <PatientRow key={p.id} patient={p} index={i} onClick={() => onGoToPatient(p.id)} />
-                ))
-              ) : (
-                <div className="text-center py-8 text-sm text-slatey-400">Sin pacientes programados</div>
-              )}
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div key="week" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}>
-            <div className="flex items-center justify-between px-1 mb-3">
-              <div>
-                <h3 className="text-sm font-bold text-slatey-900">Semana del 15 al 21 Sep</h3>
-                <p className="text-xs text-slatey-500">Carga de pacientes proyectada</p>
-              </div>
-              <Badge variant="primary" size="sm">
-                <Calendar className="w-3 h-3" /> {WEEK_SCHEDULE.reduce((s, d) => s + d.patients.length, 0)} total
-              </Badge>
-            </div>
-            <div className="space-y-3">
-              {WEEK_SCHEDULE.map((dayData, di) => (
-                <div key={dayData.dayLabel} className="bg-white rounded-2xl border border-slatey-100 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-slatey-50 border-b border-slatey-100">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-slatey-900">{dayData.fullDate}</span>
-                    </div>
-                    <Badge variant={dayData.patients.length > 0 ? 'primary' : 'neutral'} size="sm">
-                      {dayData.patients.length} {dayData.patients.length === 1 ? 'paciente' : 'pacientes'}
-                    </Badge>
-                  </div>
-                  {dayData.patients.length > 0 ? (
-                    <div className="p-2 space-y-1.5">
-                      {dayData.patients.map((p, pi) => (
-                        <PatientRow key={p.id} patient={p} index={pi} onClick={() => onGoToPatient(p.id)} compact />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="px-4 py-3 text-xs text-slatey-400 text-center">Sin pacientes programados</div>
+      <div className="space-y-3">
+        {visibles.map((p, i) => {
+          const tel = (p.telefono ?? '').replace(/\s/g, '');
+          return (
+            <motion.div
+              key={p.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: Math.min(i, 8) * 0.04 }}
+              className="bg-white rounded-2xl border border-slatey-100 p-4"
+            >
+              <button onClick={() => onGoToPatient(p.id)} className="w-full flex items-center gap-3 text-left">
+                <div className="w-12 h-12 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-bold flex-shrink-0" aria-hidden="true">
+                  {iniciales(p.nombre)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-slatey-900 truncate">{p.nombre}</p>
+                  <p className="text-xs text-slatey-500 mt-0.5">
+                    {p.visitas} {p.visitas === 1 ? 'visita atendida' : 'visitas atendidas'}
+                    {p.ultimaCita ? ` · última: ${diaLima(p.ultimaCita)}` : ''}
+                  </p>
+                  {p.proxima && (
+                    <p className="text-xs font-semibold text-primary-600 mt-1 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> Próxima: {diaLima(p.proxima.inicio)} · {horaLima(p.proxima.inicio)}
+                    </p>
                   )}
                 </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+                <ChevronRight className="w-5 h-5 text-slatey-300 flex-shrink-0" />
+              </button>
+              {tel && (
+                <div className="flex gap-2 mt-3 pt-3 border-t border-slatey-100">
+                  <a href={`tel:${tel}`} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-success-50 text-success-700 text-xs font-bold hover:bg-success-100">
+                    <Phone className="w-3.5 h-3.5" /> Llamar
+                  </a>
+                  <a href={`https://wa.me/${tel.replace(/^\+/, '')}`} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-success-50 text-success-700 text-xs font-bold hover:bg-success-100">
+                    <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                  </a>
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
     </div>
-  );
-}
-
-function PatientRow({ patient, index, onClick, compact = false }: { patient: AgendaPatient; index: number; onClick: () => void; compact?: boolean }) {
-  const status = statusConfig[patient.status];
-  const strikeCount = patient.strikes;
-  const lateCount = patient.lateArrivals;
-  const isBlocked = patient.reputationStatus === 'BLOCKED_RISK';
-
-  return (
-    <motion.button
-      initial={{ opacity: 0, y: 5 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.04 }}
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 ${compact ? 'p-2.5' : 'p-3'} rounded-xl ${isBlocked ? 'border-2 border-error-500' : 'border-white'} bg-white border border-slatey-100 hover:border-primary-200 transition-colors text-left`}
-    >
-      <img src={patient.photo} alt={patient.name} className="w-10 h-10 rounded-xl object-cover flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-slatey-900 truncate">{patient.name}</span>
-          {!compact && <span className="text-xs text-slatey-400 flex-shrink-0">· {patient.dni}</span>}
-        </div>
-        <div className="flex items-center gap-1.5 mt-0.5">
-          {!compact && <span className="text-xs font-semibold text-slatey-600">{patient.time}</span>}
-          {!compact && <span className="text-xs text-slatey-400">·</span>}
-          <span className="text-xs text-slatey-500 truncate">{patient.treatment}</span>
-          {(strikeCount > 0 || lateCount > 0) && (
-            <span className="flex items-center gap-1 ml-2">
-              <Badge variant="error" size="sm" className="flex items-center gap-1">
-                <XCircle className="h-2.5 w-2.5" />
-                {lateCount > 0 ? `Tardanzas: ${lateCount}` : `Inasistencias: ${strikeCount}`}
-                <span className="flex gap-0.5 ml-1">
-                  {Array.from({ length: 3 }, (_, i) => (
-                    <span
-                      key={i}
-                      className={`w-1 h-1 rounded-full border border-slatey-300 ${i < strikeCount ? 'bg-error-500 border-error-500' : 'bg-transparent'}`}
-                    />
-                  ))}
-                </span>
-              </Badge>
-            </span>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-1.5 flex-shrink-0">
-        <a
-          href={`tel:${patient.phone.replace(/\s/g, '')}`}
-          onClick={(e) => e.stopPropagation()}
-          className="w-8 h-8 rounded-lg bg-success-100 flex items-center justify-center hover:bg-success-200 transition-colors"
-        >
-          <Phone className="w-4 h-4 text-success-600" />
-        </a>
-        <a
-          href={`https://wa.me/51${patient.whatsapp}`}
-          onClick={(e) => e.stopPropagation()}
-          className="w-8 h-8 rounded-lg bg-success-100 flex items-center justify-center hover:bg-success-200 transition-colors"
-        >
-          <MessageCircle className="w-4 h-4 text-success-600" />
-        </a>
-        <div className="flex items-center gap-2">
-          <Badge variant={status.variant} size="sm">{status.label}</Badge>
-          {isBlocked && (
-            <Badge variant="error" size="sm" className="ml-2">
-              Riesgo alto
-            </Badge>
-          )}
-        </div>
-        <ChevronRight className="w-4 h-4 text-slatey-300" />
-      </div>
-    </motion.button>
   );
 }

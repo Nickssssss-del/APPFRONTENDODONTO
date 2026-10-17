@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Component, ErrorInfo, ReactNode, useEffect } from 'react';
-import { AppProvider, useApp } from './store';
+import { AppProvider } from './store';
+import { useApp } from './storeHooks';
 import SplashScreen from './screens/SplashScreen';
 import WelcomeTutorial from './screens/WelcomeTutorial';
 import Onboarding from './screens/Onboarding';
@@ -152,7 +153,7 @@ const dentistTourConfig: TourConfig = {
 const PRE_AUTH_SCREENS = new Set<Screen>(['splash', 'tutorial', 'onboarding']);
 
 /** Abre el diagnóstico de conexión con el backend: http://localhost:5173/?diagnostico=1 */
-const SHOW_DIAGNOSTICO = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('diagnostico');
+const SHOW_DIAGNOSTICO = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('diagnostico');
 
 function AppContent() {
   const { screen, setScreen, isAuth, role, sessionLoading } = useApp();

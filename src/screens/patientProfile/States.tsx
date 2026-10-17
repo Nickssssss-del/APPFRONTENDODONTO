@@ -1,8 +1,11 @@
+import type { CSSProperties } from 'react';
+
 /** Skeleton block — reusable pulse placeholder */
-export function Skeleton({ className = '' }: { className?: string }) {
+export function Skeleton({ className = '', style }: { className?: string; style?: CSSProperties }) {
   return (
     <div
       className={`animate-pulse rounded-2xl bg-slatey-200/70 ${className}`}
+      style={style}
       aria-hidden="true"
     />
   );
@@ -29,7 +32,7 @@ export function HistorialSkeleton() {
     <div className="space-y-3 p-4" aria-label="Cargando historial…" aria-busy="true">
       {Array.from({ length: 4 }).map((_, i) => (
         <div key={i} className="flex gap-3">
-          <Skeleton className="w-2 flex-shrink-0 rounded-full" style={{ minHeight: '80px' } as React.CSSProperties} />
+          <Skeleton className="w-2 flex-shrink-0 rounded-full" style={{ minHeight: '80px' }} />
           <Skeleton className="flex-1 h-20" />
         </div>
       ))}

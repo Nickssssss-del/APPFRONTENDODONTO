@@ -1,27 +1,27 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, Bot, Calendar, ShieldCheck, Clock } from 'lucide-react';
-import { useApp } from '../store';
+import { useApp } from '../storeHooks';
 import type { ChatMessage } from '../types';
+import { enviarMensaje, type OpcionChat } from '@/api/chatbot';
+import { detalleCita } from '@/api/citas';
+import { ApiError } from '@/api/http';
+import { diaLima, horaLima } from '@/lib/format';
 
+/** Mensaje del chat; los del bot pueden traer botones sugeridos (opciones). */
+type ChatItem = ChatMessage & { opciones?: OpcionChat[] };
+
+// Atajos: se envían al backend como cualquier mensaje escrito.
 const QUICK_REPLIES = [
-  { label: '¿Cómo reprogramar?', icon: Calendar },
-  { label: 'Política de reembolso 24h', icon: ShieldCheck },
-  { label: 'Tolerancia 15 min', icon: Clock },
+  { label: 'Buscar odontólogo', icon: Calendar },
+  { label: 'Mis citas', icon: Clock },
+  { label: 'Menú', icon: ShieldCheck },
 ];
 
-const BOT_RESPONSES: Record<string, string> = {
-  '¿Cómo reprogramar?':
-    'Para reprogramar tu cita: 1) Ve a "Mis Citas" en tu dashboard. 2) Selecciona la cita que quieres cambiar. 3) Elige nueva fecha y hora. 4) Confirma. Recuerda: si lo haces con más de 24h de anticipación, no pierdes tu garantía. ¿Te ayudo con algo más?',
-  'Política de reembolso 24h':
-    'Nuestra política de reembolso: Si cancelas con 24+ horas de anticipación, tu garantía de S/ 20.00 es 100% reembolsable. Si cancelas con menos de 24h, la garantía se retiene como compensación al odontólogo. En caso de fuerza mayor (descanso médico), puedes apelar la inasistencia desde tu dashboard.',
-  'Tolerancia 15 min':
-    'El sistema de tolerancia funciona así: Tienes 15 minutos de gracia desde la hora de tu cita. Pasado ese tiempo, el odontólogo puede marcar inasistencia, lo que aplica 1 strike a tu récord. Con 3 strikes, tu cuenta puede ser restringida temporalmente. Siempre puedes apelar con un descanso médico válido.',
-};
-
 export default function Chatbot() {
-  const { setScreen } = useApp();
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  const { setScreen, setActiveCita, setSelectedTreatment, setSelectedDay, setSelectedTime, setSelectedDentistName } = useApp();
+  const [sesionId, setSesionId] = useState<string | undefined>(undefined);
+  const [messages, setMessages] = useState<ChatItem[]>([
     {
       id: '1',
       sender: 'bot',
@@ -37,28 +37,60 @@ export default function Chatbot() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, typing]);
 
-  const sendMessage = (text: string) => {
-    if (!text.trim()) return;
-    const userMsg: ChatMessage = {
-      id: String(Date.now()),
-      sender: 'user',
-      text,
-      timestamp: Date.now(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
+  const agregarBot = (text: string, opciones?: OpcionChat[]) =>
+    setMessages((prev) => [...prev, { id: String(Date.now() + Math.random()), sender: 'bot', text, timestamp: Date.now(), opciones }]);
+
+  // El chat no cobra: la acción "pagar_deposito" lleva a la pantalla de pago con la cita que creó el bot.
+  const irAPagar = async (citaId: string) => {
+    setTyping(true);
+    try {
+      const c = await detalleCita(citaId);
+      setActiveCita(c);
+      setSelectedDentistName(c.odontologo.nombre);
+      setSelectedTreatment({
+        id: c.servicio.id,
+        name: c.servicio.titulo,
+        price: c.precio,
+        description: '',
+        duration: Math.max(1, Math.round((new Date(c.fin).getTime() - new Date(c.inicio).getTime()) / 60000)),
+        deposit: c.depositoRequerido,
+      });
+      setSelectedDay(diaLima(c.inicio));
+      setSelectedTime(horaLima(c.inicio));
+      setScreen('checkout');
+    } catch (e) {
+      agregarBot(e instanceof ApiError ? e.message : 'No pude abrir el pago. Revisa "Mis citas".');
+    } finally {
+      setTyping(false);
+    }
+  };
+
+  const sendMessage = async (text: string, accion?: string, valor?: string | null) => {
+    if (!text.trim() || typing) return;
+
+    if (accion === 'pagar_deposito' && valor) {
+      void irAPagar(valor);
+      return;
+    }
+
+    setMessages((prev) => [...prev, { id: String(Date.now()), sender: 'user', text, timestamp: Date.now() }]);
     setInput('');
     setTyping(true);
-
-    setTimeout(() => {
-      const response =
-        BOT_RESPONSES[text] ||
-        `Entiendo tu consulta sobre "${text}". Estoy aquí para orientarte. Para asistencia más específica, puedes contactar directamente a tu odontólogo desde el dashboard o escribirnos a soporte@odontosystem.pe. ¿Hay algo más en lo que pueda ayudarte?`;
-      setMessages((prev) => [
-        ...prev,
-        { id: String(Date.now() + 1), sender: 'bot', text: response, timestamp: Date.now() },
-      ]);
+    try {
+      const r = await enviarMensaje(text, sesionId, accion, valor);
+      setSesionId(r.sesionId);
+      agregarBot(r.mensaje, r.opciones);
+    } catch (e) {
+      agregarBot(
+        e instanceof ApiError && e.status === 0
+          ? 'No pude conectarme con el servidor. Revisa tu internet e inténtalo de nuevo.'
+          : e instanceof ApiError
+          ? e.message
+          : 'Ocurrió un error. Inténtalo de nuevo.',
+      );
+    } finally {
       setTyping(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -114,7 +146,21 @@ export default function Chatbot() {
                     <span className="text-xs font-bold text-primary-600">OdontoBot</span>
                   </div>
                 )}
-                <p>{msg.text}</p>
+                <p className="whitespace-pre-line">{msg.text}</p>
+                {msg.sender === 'bot' && msg.opciones && msg.opciones.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {msg.opciones.map((op, k) => (
+                      <button
+                        key={`${op.accion}-${op.valor ?? k}`}
+                        onClick={() => sendMessage(op.etiqueta, op.accion, op.valor)}
+                        disabled={typing || msg.id !== messages[messages.length - 1]?.id}
+                        className="px-3 py-1.5 rounded-full bg-primary-50 border border-primary-200 text-primary-700 text-xs font-semibold hover:bg-primary-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {op.etiqueta}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </motion.div>
           ))}

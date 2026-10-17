@@ -1,246 +1,145 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  Bell, CalendarCheck, CheckCircle2, Clock3, CreditCard, ShieldCheck,
-  ArrowRight, Check, Sparkles, Mail, Smartphone, MessageCircle,
-} from 'lucide-react';
-import { useApp } from '@/store';
-import { Badge } from '@/components/ui';
+import { Bell, CalendarCheck, CheckCircle2, Clock3, CreditCard, AlertTriangle, ArrowRight, Star, Loader2 } from 'lucide-react';
+import { useApp } from '@/storeHooks';
+import { Button } from '@/components/ui';
+import { useAsync } from '@/hooks/useAsync';
+import { ApiError } from '@/api/http';
+import { citasPorResenar, crearResena } from '@/api/panel';
+import { diaLima, horaLima, soles } from '@/lib/format';
+import type { CitaApi } from '@/api/citas';
 import type { Screen } from '@/types';
 
-type NotificationChannel = 'email' | 'push' | 'whatsapp';
-
-type NotificationKind = 'appointment' | 'confirmation' | 'schedule' | 'payment' | 'security';
-
-type PatientNotification = {
+/**
+ * El backend envía avisos por correo, pero no expone una bandeja de notificaciones.
+ * Esta pantalla muestra lo que requiere atención según el estado REAL de tus citas
+ * (GET /api/citas/mias y GET /api/citas/por-resenar). Nada se inventa ni se guarda localmente.
+ */
+type Aviso = {
   id: string;
-  kind: NotificationKind;
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-  actionLabel?: string;
-  actionScreen?: Screen;
-  channels: NotificationChannel[];
+  icon: typeof Bell;
+  tono: string;
+  titulo: string;
+  mensaje: string;
+  fecha: string;
+  accion?: { label: string; screen: Screen };
 };
 
-const MOCK_NOTIFICATIONS: PatientNotification[] = [
-  {
-    id: 'notification-1',
-    kind: 'appointment',
-    title: 'Recordatorio de cita próxima',
-    message: 'Tu cita con el Dr. Carlos Mendoza es el Lun 22 Sep a las 09:00. Llegación recomendada: 10 minutos antes.',
-    time: 'Hace 15 min',
-    read: false,
-    actionLabel: 'Ver mis citas',
-    actionScreen: 'misCitas',
-    channels: ['email', 'push', 'whatsapp'],
-  },
-  {
-    id: 'notification-2',
-    kind: 'confirmation',
-    title: 'Cita confirmada',
-    message: 'El Dr. Miguel Torres confirmó tu solicitud para el Sáb 27 Sep a las 10:00.',
-    time: 'Ayer',
-    read: false,
-    actionLabel: 'Ver detalles',
-    actionScreen: 'misCitas',
-    channels: ['email', 'push'],
-  },
-  {
-    id: 'notification-3',
-    kind: 'schedule',
-    title: 'Cambio de horario',
-    message: 'La Dra. Patricia Ruiz movió tu control de ortodoncia al Jue 25 Sep a las 11:30. Revisa la actualización.',
-    time: 'Ayer',
-    read: false,
-    actionLabel: 'Revisar cita',
-    actionScreen: 'misCitas',
-    channels: ['email', 'whatsapp'],
-  },
-  {
-    id: 'notification-4',
-    kind: 'payment',
-    title: 'Garantía de reserva registrada',
-    message: 'Recibimos el pago de S/ 20.00 de tu garantía. Es 100% reembolsable con 24h de anticipación.',
-    time: 'Hace 2 días',
-    read: true,
-    actionLabel: 'Ver comprobante',
-    actionScreen: 'misCitas',
-    channels: ['email', 'push', 'whatsapp'],
-  },
-  {
-    id: 'notification-5',
-    kind: 'security',
-    title: 'Acceso seguro verificado',
-    message: 'Tu sesión se protegió correctamente. Puedes administrar la biometría de tu ficha médica en Perfil.',
-    time: 'Hace 3 días',
-    read: true,
-    actionLabel: 'Ir a Perfil',
-    actionScreen: 'dentistProfile',
-    channels: ['push'],
-  },
-];
+function avisoDeCita(c: CitaApi): Aviso | null {
+  const cuando = `${diaLima(c.inicio)} a las ${horaLima(c.inicio)}`;
+  const con = `${c.servicio.titulo} con ${c.odontologo.nombre}`;
+  switch (c.estado) {
+    case 'PENDIENTE_PAGO':
+      if (c.pagarAntesDe && new Date(c.pagarAntesDe).getTime() < Date.now()) return null;
+      return { id: c.id, icon: CreditCard, tono: 'bg-accent-50 text-accent-600', titulo: 'Falta pagar el depósito', mensaje: `${con} (${cuando}). Paga ${soles(c.depositoRequerido)} antes de que se libere el turno.`, fecha: c.creadoEn, accion: { label: 'Ir a mis citas', screen: 'misCitas' } };
+    case 'PENDIENTE_CONFIRMACION':
+      return { id: c.id, icon: Clock3, tono: 'bg-primary-50 text-primary-600', titulo: 'Esperando confirmación', mensaje: `${con} (${cuando}). El odontólogo debe confirmar tu reserva.`, fecha: c.creadoEn, accion: { label: 'Ver cita', screen: 'misCitas' } };
+    case 'CONFIRMADA':
+      if (new Date(c.fin).getTime() < Date.now()) return null;
+      return { id: c.id, icon: CalendarCheck, tono: 'bg-success-50 text-success-600', titulo: 'Cita confirmada', mensaje: `${con} (${cuando}).`, fecha: c.creadoEn, accion: { label: 'Ver cita', screen: 'misCitas' } };
+    case 'CANCELADA_CON_REEMBOLSO':
+      return { id: c.id, icon: CheckCircle2, tono: 'bg-slatey-100 text-slatey-600', titulo: 'Cita cancelada con reembolso', mensaje: `${con} (${cuando})${c.motivoCancelacion ? `: ${c.motivoCancelacion}` : '.'}`, fecha: c.inicio };
+    case 'INASISTENCIA_PENALIZADA':
+      return { id: c.id, icon: AlertTriangle, tono: 'bg-error-50 text-error-600', titulo: 'Inasistencia registrada', mensaje: `${con} (${cuando}). Si fue por un imprevisto médico, puedes apelar dentro de 7 días.`, fecha: c.fin, accion: { label: 'Apelar', screen: 'patientDashboard' } };
+    default:
+      return null;
+  }
+}
 
-const notificationConfig: Record<NotificationKind, { icon: typeof Bell; className: string; badge: 'primary' | 'success' | 'accent' }> = {
-  appointment: { icon: CalendarCheck, className: 'bg-primary-50 text-primary-600', badge: 'primary' },
-  confirmation: { icon: CheckCircle2, className: 'bg-success-50 text-success-600', badge: 'success' },
-  schedule: { icon: Clock3, className: 'bg-accent-50 text-accent-600', badge: 'accent' },
-  payment: { icon: CreditCard, className: 'bg-primary-50 text-primary-600', badge: 'primary' },
-  security: { icon: ShieldCheck, className: 'bg-success-50 text-success-600', badge: 'success' },
-};
-
-const channelConfig: Record<NotificationChannel, { icon: typeof Mail; label: string; color: string }> = {
-  email: { icon: Mail, label: 'Correo', color: 'bg-blue-50 text-blue-700' },
-  push: { icon: Smartphone, label: 'Push', color: 'bg-purple-50 text-purple-700' },
-  whatsapp: { icon: MessageCircle, label: 'WhatsApp', color: 'bg-green-50 text-green-700' },
-};
+function Resena({ citaId, odontologo, servicio, onListo }: { citaId: string; odontologo: string; servicio: string; onListo: () => void }) {
+  const [nota, setNota] = useState(0);
+  const [comentario, setComentario] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const enviar = async () => {
+    if (!nota || enviando) return;
+    setEnviando(true);
+    setError(null);
+    try {
+      await crearResena(citaId, nota, comentario.trim() || undefined);
+      onListo();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'No se pudo enviar tu reseña.');
+    } finally {
+      setEnviando(false);
+    }
+  };
+  return (
+    <div className="rounded-2xl border border-primary-200 bg-white p-4 space-y-3 shadow-sm shadow-primary-500/5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-600"><Star className="h-5 w-5" /></div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-bold text-slatey-900">¿Cómo te fue?</h3>
+          <p className="text-xs text-slatey-600 mt-0.5">{servicio} con {odontologo}</p>
+        </div>
+      </div>
+      <div className="flex gap-1" role="radiogroup" aria-label="Calificación">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} role="radio" aria-checked={nota === n} aria-label={`${n} estrellas`} onClick={() => setNota(n)} className="p-1">
+            <Star className={`h-7 w-7 ${n <= nota ? 'fill-amber-400 text-amber-400' : 'text-slatey-300'}`} />
+          </button>
+        ))}
+      </div>
+      <textarea value={comentario} onChange={(e) => setComentario(e.target.value.slice(0, 1000))} rows={2} placeholder="Comentario (opcional)" aria-label="Comentario" className="w-full px-3 py-2.5 rounded-xl border-2 border-slatey-200 bg-slatey-50 text-sm focus:border-primary-400 focus:outline-none resize-none" />
+      {error && <p role="alert" className="text-xs font-medium text-error-600">{error}</p>}
+      <Button fullWidth size="sm" disabled={!nota} loading={enviando} onClick={enviar}>Enviar reseña</Button>
+    </div>
+  );
+}
 
 export default function PatientNotifications() {
-  const { setScreen, user } = useApp();
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [readIds, setReadIds] = useState<Set<string>>(
-    () => new Set(MOCK_NOTIFICATIONS.filter((notification) => notification.read).map((notification) => notification.id)),
+  const { setScreen, user, citas } = useApp();
+  const porResenar = useAsync((signal) => citasPorResenar(signal), []);
+  const avisos = useMemo(
+    () => citas.map(avisoDeCita).filter((a): a is Aviso => a !== null).sort((a, b) => b.fecha.localeCompare(a.fecha)),
+    [citas],
   );
-
-  const notifications = useMemo(
-    () => MOCK_NOTIFICATIONS.map((notification) => ({
-      ...notification,
-      read: readIds.has(notification.id),
-    })),
-    [readIds],
-  );
-  const visibleNotifications = notifications.filter((notification) => filter === 'all' || !notification.read);
-  const unreadCount = notifications.filter((notification) => !notification.read).length;
-
-  const markAllAsRead = () => {
-    setReadIds(new Set(notifications.map((notification) => notification.id)));
-  };
-
-  const openAction = (notification: PatientNotification) => {
-    setReadIds((current) => new Set([...current, notification.id]));
-    if (notification.actionScreen) setScreen(notification.actionScreen);
-  };
+  const pendientesResena = porResenar.data ?? [];
+  const vacio = avisos.length === 0 && pendientesResena.length === 0;
 
   return (
     <div className="min-h-screen bg-slatey-50 pb-24">
       <div className="sticky top-0 z-30 border-b border-slatey-100 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto max-w-md px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-bold text-slatey-900 font-display">Notificaciones</h2>
-              <p className="text-xs text-slatey-500">{user.fullName || 'Paciente'} · Mantente al día con tu salud bucal</p>
-            </div>
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-primary-50">
-              <Bell className="h-5 w-5 text-primary-600" />
-            </div>
+        <div className="mx-auto max-w-md px-4 py-3 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-bold text-slatey-900 font-display">Notificaciones</h2>
+            <p className="text-xs text-slatey-500">{user.fullName || 'Paciente'} · Lo que necesita tu atención</p>
           </div>
-          {unreadCount > 0 && (
-            <div className="mt-3 flex items-center gap-2 rounded-xl bg-primary-50 px-3 py-2">
-              <Sparkles className="h-4 w-4 text-primary-600" />
-              <p className="text-xs font-semibold text-primary-700">Tienes {unreadCount} notificacion{unreadCount === 1 ? '' : 'es'} sin leer</p>
-            </div>
-          )}
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-primary-50"><Bell className="h-5 w-5 text-primary-600" /></div>
         </div>
       </div>
 
-      <div className="mx-auto max-w-md space-y-5 px-4 py-5">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex rounded-2xl bg-slatey-100 p-1">
-            {([
-              { value: 'all', label: 'Todas' },
-              { value: 'unread', label: 'Sin leer' },
-            ] as const).map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => setFilter(tab.value)}
-                className={`rounded-xl px-4 py-2 text-sm font-bold transition-all ${
-                  filter === tab.value ? 'bg-white text-primary-600 shadow-sm' : 'text-slatey-500 hover:text-slatey-700'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-          {unreadCount > 0 && (
-            <button
-              onClick={markAllAsRead}
-              className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold text-primary-600 hover:bg-primary-50"
-            >
-              <Check className="h-4 w-4" /> Marcar todas
-            </button>
-          )}
-        </div>
+      <div className="mx-auto max-w-md space-y-4 px-4 py-5">
+        {porResenar.loading && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-primary-500" aria-label="Cargando" /></div>}
+        {pendientesResena.map((p) => (
+          <Resena key={p.citaId} citaId={p.citaId} odontologo={p.odontologo} servicio={p.servicio} onListo={porResenar.reload} />
+        ))}
 
-        {visibleNotifications.length === 0 ? (
+        {avisos.map((a) => {
+          const Icon = a.icon;
+          return (
+            <motion.div key={a.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl border border-slatey-100 bg-white p-4">
+              <div className="flex items-start gap-3">
+                <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ${a.tono}`}><Icon className="h-5 w-5" /></div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-bold text-slatey-900">{a.titulo}</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-slatey-600">{a.mensaje}</p>
+                  {a.accion && (
+                    <button onClick={() => setScreen(a.accion!.screen)} className="mt-3 flex items-center gap-1.5 rounded-xl bg-slatey-50 px-3 py-2 text-xs font-bold text-primary-600 hover:bg-primary-50">
+                      {a.accion.label} <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          );
+        })}
+
+        {vacio && !porResenar.loading && (
           <div className="flex flex-col items-center rounded-2xl border border-dashed border-slatey-200 bg-white py-12 text-center">
-            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success-50">
-              <Bell className="h-7 w-7 text-success-500" />
-            </div>
+            <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success-50"><Bell className="h-7 w-7 text-success-500" /></div>
             <h3 className="text-sm font-bold text-slatey-900">Todo está al día</h3>
-            <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-slatey-500">
-              {filter === 'unread' ? 'No tienes notificaciones sin leer.' : 'Cuando haya actualizaciones importantes, las verás aquí.'}
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {visibleNotifications.map((notification) => {
-              const config = notificationConfig[notification.kind];
-              const Icon = config.icon;
-              return (
-                <motion.div
-                  key={notification.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-2xl border p-4 transition-all ${
-                    notification.read ? 'border-slatey-100 bg-white' : 'border-primary-200 bg-white shadow-sm shadow-primary-500/5'
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl ${config.className}`}>
-                      <Icon className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold text-slatey-900">{notification.title}</h3>
-                            {!notification.read && <span className="h-2 w-2 flex-shrink-0 rounded-full bg-primary-500" />}
-                          </div>
-<p className="mt-1 text-xs leading-relaxed text-slatey-600">{notification.message}</p>
-                          {notification.channels.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {notification.channels.map((ch) => {
-                                const cfg = channelConfig[ch];
-                                const ChIcon = cfg.icon;
-                                return (
-                                  <Badge key={ch} variant="neutral" size="sm" className={cfg.color}>
-                                    <ChIcon className="w-3 h-3 mr-1" />
-                                    {cfg.label}
-                                  </Badge>
-                                );
-                              })}
-                            </div>
-                          )}
-                          <p className="mt-2 text-[11px] font-medium text-slatey-400">{notification.time}</p>
-                        </div>
-                        <Badge variant={config.badge} size="sm">
-                          {notification.read ? 'Leída' : 'Nueva'}
-                        </Badge>
-                      </div>
-                      {notification.actionLabel && notification.actionScreen && (
-                        <button
-                          onClick={() => openAction(notification)}
-                          className="mt-3 flex items-center gap-1.5 rounded-xl bg-slatey-50 px-3 py-2 text-xs font-bold text-primary-600 transition-colors hover:bg-primary-50"
-                        >
-                          {notification.actionLabel} <ArrowRight className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+            <p className="mx-auto mt-1 max-w-xs text-xs leading-relaxed text-slatey-500">Cuando una cita necesite tu atención (pago, confirmación o reseña) la verás aquí. Los recordatorios te llegan también por correo.</p>
           </div>
         )}
       </div>

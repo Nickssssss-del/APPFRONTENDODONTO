@@ -1,8 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
-import { useApp, DAY_LABELS } from '../../store';
-import { Button } from '../../components/ui';
+import { useApp } from '../../store';
+import { Button, Modal } from '../../components/ui';
+import { pagarDeposito, reservarCita, type MetodoPago } from '@/api/citas';
+import { ApiError } from '@/api/http';
+import { segundosHasta } from '@/lib/format';
 
 import { AppointmentSummary } from './AppointmentSummary';
 import { MethodSelector } from './MethodSelector';
@@ -14,21 +17,40 @@ import { RejectedModal } from './RejectedModal';
 
 import type { PayState, PayMethod, Provider, CardFields } from './types';
 
+const METODO_API: Record<PayMethod, MetodoPago> = { yape: 'YAPE', plin: 'PLIN', card: 'TARJETA' };
+
 export default function CheckoutScreen() {
   const {
     setScreen,
     selectedTreatment,
     selectedDay,
     selectedTime,
-    holdSeconds,
-    isHoldActive,
-    user,
-    createAppointmentRequest,
+    selectedDentistName,
+    selectedDentistId,
+    selectedSlotStart,
+    activeCita,
+    setActiveCita,
+    setSelectedSlotStart,
+    setSelectedTime,
+    refreshAppointments,
   } = useApp();
 
-  // ── Derived amounts ──────────────────────────────────────────────────────────
-  const guarantee = Math.round(selectedTreatment.price * 0.2);
-  const balance = selectedTreatment.price - guarantee;
+  // Sin horario elegido ni cita pendiente no hay nada que pagar: vuelve al marketplace.
+  useEffect(() => {
+    if (!activeCita && !selectedSlotStart) setScreen('marketplace');
+  }, [activeCita, selectedSlotStart, setScreen]);
+
+  // ── Importes: los manda el backend (no se recalculan en el cliente) ──────────
+  const price = activeCita?.precio ?? selectedTreatment.price;
+  const guarantee = activeCita?.depositoRequerido ?? selectedTreatment.deposit ?? Math.round(price * 0.2);
+  const balance = Math.max(0, price - guarantee);
+
+  // ── Cuenta regresiva hasta pagar_antes_de (≈15 min); luego el turno se libera solo ──
+  const pagarAntesDe = activeCita?.pagarAntesDe ?? null;
+  const [restante, setRestante] = useState(() => segundosHasta(pagarAntesDe));
+  const totalSeconds = activeCita?.pagarAntesDe && activeCita.creadoEn
+    ? Math.max(60, Math.round((new Date(activeCita.pagarAntesDe).getTime() - new Date(activeCita.creadoEn).getTime()) / 1000))
+    : 900;
 
   // ── Local state ──────────────────────────────────────────────────────────────
   const [provider] = useState<Provider>('culqi'); // Switch UI removed; set via env/config
@@ -37,55 +59,75 @@ export default function CheckoutScreen() {
   const [payState, setPayState] = useState<PayState>('idle');
   const [showSuccess, setShowSuccess] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [expirado, setExpirado] = useState(false);
+  const [simulado, setSimulado] = useState(false);
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
-  /**
-   * INTEGRATION POINT — replace with real payment gateway call.
-   *
-   * Culqi (QR):  POST /v1/charges with the QR operation reference.
-   * Niubiz/Culqi (card): First tokenize via CardPanel.onReadyToTokenize,
-   *   then POST /v1/charges with the returned token.
-   *
-   * The function must return true on success, false on any rejection.
-   */
-  const processPayment = useCallback(
-    (_method: PayMethod, _opRef?: string): Promise<boolean> =>
-      new Promise((resolve) => {
-        setTimeout(() => resolve(Math.random() > 0.07), 1800);
-      }),
-    []
-  );
+  useEffect(() => {
+    setRestante(segundosHasta(pagarAntesDe));
+    if (!pagarAntesDe) return;
+    const t = setInterval(() => {
+      const r = segundosHasta(pagarAntesDe);
+      setRestante(r);
+      if (r <= 0) clearInterval(t);
+    }, 1000);
+    return () => clearInterval(t);
+  }, [pagarAntesDe]);
 
+  useEffect(() => {
+    if (pagarAntesDe && restante <= 0 && payState !== 'verified' && payState !== 'processing') setExpirado(true);
+  }, [restante, pagarAntesDe, payState]);
+
+  const liberarYVolver = () => {
+    setExpirado(false);
+    setActiveCita(null);
+    setSelectedSlotStart(null);
+    setSelectedTime(null);
+    setScreen('marketplace');
+  };
+
+  // ── Pago real: POST /api/citas/{id}/pagar (el backend solo recibe el método) ──
+  // Los datos de tarjeta NUNCA salen del navegador hacia nuestro backend.
   const handlePay = async () => {
+    if (payState === 'processing') return;
     setPayState('processing');
-    const opRef = payMethod !== 'card' ? operationNumber : undefined;
-    const ok = await processPayment(payMethod, opRef);
-
-    if (ok) {
+    setErrorMsg(null);
+    let paso: 'reservar' | 'pagar' = 'reservar';
+    try {
+      // 1) Se reserva el turno justo ahora (si ya hay una cita pendiente, p. ej. tras un pago rechazado, se reutiliza).
+      let cita = activeCita;
+      if (!cita) {
+        if (!selectedDentistId || !selectedSlotStart) throw new ApiError(400, 'Falta elegir odontólogo y horario.');
+        cita = await reservarCita(selectedDentistId, selectedTreatment.id, selectedSlotStart);
+        setActiveCita(cita);
+      }
+      // 2) Se paga el depósito. El backend solo recibe el método: los datos de tarjeta NUNCA salen del navegador.
+      paso = 'pagar';
+      const pago = await pagarDeposito(cita.id, METODO_API[payMethod]);
+      setActiveCita(pago.cita);
+      setSimulado(pago.simulado);
       setPayState('verified');
-      const dayLabel =
-        DAY_LABELS.find((label) => selectedDay.startsWith(label)) ?? 'Lun';
-      createAppointmentRequest({
-        dentistId: '1',
-        patientName: user.fullName || 'María González',
-        patientDni: user.dni || '12345678',
-        patientAge: user.age || '28',
-        patientEmail: user.email,
-        patientPhone: user.phone,
-        treatment: selectedTreatment,
-        dayLabel,
-        selectedDay,
-        selectedTime: selectedTime ?? '10:00',
-      });
+      void refreshAppointments(); // trae al store la cita ya confirmada
       setTimeout(() => setShowSuccess(true), 600);
-    } else {
-      setPayState('rejected');
-      setShowRejected(true);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'No se pudo procesar el pago.';
+      setErrorMsg(msg);
+      if (e instanceof ApiError && e.status === 409) {
+        // Reservar: el turno se ocupó. Pagar: pasaron los 15 minutos y el turno se liberó.
+        if (paso === 'reservar') setSelectedSlotStart(null);
+        setActiveCita(null);
+        setPayState('idle');
+        setExpirado(true);
+      } else {
+        setPayState('rejected');
+        setShowRejected(true);
+      }
     }
   };
 
   const handleRetry = () => {
     setShowRejected(false);
+    setErrorMsg(null);
     setPayState('idle');
     setOperationNumber('');
   };
@@ -109,7 +151,7 @@ export default function CheckoutScreen() {
   const cardReady = payMethod === 'card'; // card readiness is validated inside CardPanel
   const canPay = payState === 'idle' && (qrReady || cardReady);
 
-  const time = selectedTime ?? '10:00';
+  const time = selectedTime ?? '';
 
   return (
     <>
@@ -118,8 +160,8 @@ export default function CheckoutScreen() {
         <div className="sticky top-0 z-30 glass border-b border-slatey-100 flex-shrink-0">
           <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
             <button
-              onClick={() => setScreen('marketplace')}
-              aria-label="Volver al marketplace"
+              onClick={() => setScreen(activeCita ? 'misCitas' : 'marketplace')}
+              aria-label="Volver"
               className="p-2 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors"
             >
               <ArrowLeft className="w-5 h-5 text-slatey-700" />
@@ -128,7 +170,7 @@ export default function CheckoutScreen() {
               <h2 className="text-lg font-bold text-slatey-900 font-display">
                 Pago del depósito
               </h2>
-              <p className="text-xs text-slatey-500">20% del precio · S/ {guarantee.toFixed(2)}</p>
+              <p className="text-xs text-slatey-500">Depósito de reserva · S/ {guarantee.toFixed(2)}</p>
             </div>
           </div>
         </div>
@@ -141,10 +183,12 @@ export default function CheckoutScreen() {
               treatment={selectedTreatment}
               selectedDay={selectedDay}
               selectedTime={time}
-              holdSeconds={holdSeconds}
-              isHoldActive={isHoldActive}
+              holdSeconds={restante}
+              isHoldActive={restante > 0}
+              totalSeconds={totalSeconds}
               guarantee={guarantee}
               balance={balance}
+              dentistName={selectedDentistName || activeCita?.odontologo.nombre || 'Odontólogo'}
             />
 
             {/* Method selector */}
@@ -205,7 +249,7 @@ export default function CheckoutScreen() {
           <div className="max-w-md mx-auto">
             {payState === 'rejected' && (
               <p className="text-xs text-error-600 font-semibold text-center mb-2" role="alert">
-                El pago fue rechazado. Reintenta o elige otro método.
+                {errorMsg ?? 'El pago fue rechazado. Reintenta o elige otro método.'}
               </p>
             )}
             <Button
@@ -248,19 +292,37 @@ export default function CheckoutScreen() {
         selectedTime={time}
         guarantee={guarantee}
         balance={balance}
+        dentistName={selectedDentistName || activeCita?.odontologo.nombre || 'Odontólogo'}
+        pendingConfirmation={activeCita?.estado === 'PENDIENTE_CONFIRMACION'}
+        simulated={simulado}
+        startIso={activeCita?.inicio}
+        endIso={activeCita?.fin}
         onClose={() => {
           setShowSuccess(false);
-          setScreen('patientDashboard');
+          setActiveCita(null);
+          setSelectedSlotStart(null);
+          setSelectedTime(null);
+          setScreen('misCitas');
         }}
       />
 
       <RejectedModal
         open={showRejected}
         currentMethod={payMethod}
-        holdSeconds={holdSeconds}
+        holdSeconds={restante}
+        message={errorMsg}
         onRetry={handleRetry}
         onSwitchMethod={handleSwitchMethod}
       />
+
+      <Modal open={expirado} onClose={liberarYVolver} title="El tiempo para pagar terminó">
+        <div className="space-y-4">
+          <p className="text-sm text-slatey-600">
+            {errorMsg ?? 'Pasaron los 15 minutos para pagar el depósito, así que el horario se liberó.'}
+          </p>
+          <Button fullWidth size="lg" onClick={liberarYVolver}>Elegir otro horario</Button>
+        </div>
+      </Modal>
     </>
   );
 }

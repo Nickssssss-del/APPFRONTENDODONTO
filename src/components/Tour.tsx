@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, X } from 'lucide-react';
-import { useApp } from '../store';
+import { useApp } from '../storeHooks';
 
 export type TourStep = {
   id: string;
@@ -194,7 +194,7 @@ function TourOverlay({ step, stepIndex, totalSteps, targetRect, onNext, onPrev, 
         width: targetRect.width + 8,
         height: targetRect.height + 8,
       }
-    : {};
+    : { top: 0, left: 0, width: 0, height: 0 };
 
   return (
     <motion.div

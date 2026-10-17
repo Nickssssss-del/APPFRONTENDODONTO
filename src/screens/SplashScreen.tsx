@@ -4,10 +4,11 @@ import { useEffect } from 'react';
 import { hasSeenTutorial } from './WelcomeTutorial';
 
 export default function SplashScreen() {
-  const { setScreen, splashComplete, setSplashComplete } = useApp();
+  const { setScreen, splashComplete, setSplashComplete, isAuth } = useApp();
 
   // Primer uso -> tutorial; usuarios recurrentes -> directo al login.
   const goNext = () => {
+    if (isAuth) return; // sesión restaurada: el store ya eligió la pantalla
     setSplashComplete(true);
     setScreen(hasSeenTutorial() ? 'onboarding' : 'tutorial');
   };

@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, Download, Calendar, Share2 } from 'lucide-react';
 import { Button } from '../../components/ui';
 import type { Treatment } from '../../types';
-import { DENTIST_NAME } from '../../lib/dentistData';
 
 interface Props {
   open: boolean;
@@ -12,6 +11,14 @@ interface Props {
   selectedTime: string;
   guarantee: number;
   balance: number;
+  dentistName: string;
+  /** true si el odontólogo debe confirmar a mano (la cita queda PENDIENTE_CONFIRMACION). */
+  pendingConfirmation?: boolean;
+  /** true si el backend procesó el pago en modo de pruebas. */
+  simulated?: boolean;
+  /** Inicio y fin ISO de la cita, para el enlace de Google Calendar. */
+  startIso?: string | null;
+  endIso?: string | null;
   onClose: () => void;
 }
 
@@ -78,6 +85,11 @@ export function SuccessModal({
   selectedTime,
   guarantee,
   balance,
+  dentistName,
+  pendingConfirmation = false,
+  simulated = false,
+  startIso,
+  endIso,
   onClose,
 }: Props) {
   const closeBtnRef = useRef<HTMLButtonElement>(null);
@@ -89,16 +101,21 @@ export function SuccessModal({
   }, [open]);
 
   const handleAddToCalendar = () => {
-    // INTEGRATION POINT: Build Google Calendar / Apple Calendar deep-link.
-    // Example (Google):
-    // const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=...`;
-    // window.open(url, '_blank');
-    alert('Agregar al calendario (integración pendiente)');
+    if (!startIso) return;
+    const fmt = (iso: string) => new Date(iso).toISOString().replace(/[-:]|\.\d{3}/g, '');
+    const fin = endIso ?? new Date(new Date(startIso).getTime() + treatment.duration * 60_000).toISOString();
+    const url =
+      'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      `&text=${encodeURIComponent(`Cita dental: ${treatment.name}`)}` +
+      `&dates=${fmt(startIso)}/${fmt(fin)}` +
+      `&details=${encodeURIComponent(`Con ${dentistName} (OdontoSystem)`)}`;
+    window.open(url, '_blank', 'noopener');
   };
+
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
-      `¡Reservé mi cita con el Dr. ${DENTIST_NAME}! 🦷\n` +
+      `¡Reservé mi cita con ${dentistName}! 🦷\n` +
         `📅 ${selectedDay} a las ${selectedTime}\n` +
         `Servicio: ${treatment.name}\n` +
         `Descarga OdontoSystem y reserva la tuya.`
@@ -144,8 +161,16 @@ export function SuccessModal({
                   ¡Depósito confirmado!
                 </h3>
                 <p className="text-sm text-slatey-500 mt-1">
-                  Tu horario está reservado. El Dr.{' '}
-                  <strong>{DENTIST_NAME}</strong> debe confirmar la cita.
+                  {pendingConfirmation ? (
+                    <>
+                      Tu horario está reservado. <strong>{dentistName}</strong> debe confirmar la cita.
+                    </>
+                  ) : (
+                    <>
+                      Tu cita con <strong>{dentistName}</strong> está confirmada.
+                    </>
+                  )}
+                  {simulated && <span className="block text-xs text-slatey-400 mt-1">Pago simulado (modo de pruebas).</span>}
                 </p>
               </div>
 
@@ -153,7 +178,7 @@ export function SuccessModal({
               <div className="w-full bg-slatey-50 rounded-2xl p-4 space-y-2 text-sm">
                 <Row label="Servicio" value={treatment.name} />
                 <Row label="Fecha" value={`${selectedDay} · ${selectedTime}`} />
-                <Row label="Odontólogo" value={`Dr. ${DENTIST_NAME}`} />
+                <Row label="Odontólogo" value={dentistName} />
                 <div className="h-px bg-slatey-200" />
                 <Row
                   label="Depósito pagado (20%)"

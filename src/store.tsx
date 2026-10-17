@@ -1,11 +1,13 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
-import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, SessionInfo, AppointmentRequest, DayLabel } from './types';
+import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, AppointmentRequest } from './types';
 import { restoreSession, logout as apiLogout } from './api/auth';
 import { SESSION_EXPIRED_EVENT } from './api/http';
 import { obtenerYo } from './api/usuarios';
 import { agendaOdontologo, cancelarCita, confirmarCita, misCitas, pagarDeposito, reservarCita, type CitaApi, type MetodoPago } from './api/citas';
+import { TREATMENTS, DENTIST_WORK_SCHEDULE, isRealId, citaToRequest } from './constants';
+import { AppContext } from './storeContext';
 
-export type AppState = {
+type AppState = {
   role: Role;
   setRole: (r: Role) => void;
   screen: Screen;
@@ -37,7 +39,6 @@ export type AppState = {
   selectedPatientId: string | null;
   setSelectedPatientId: (id: string | null) => void;
   sessionLoading: boolean;
-  session: SessionInfo | null;
   rememberMe: boolean;
   setRememberMe: (b: boolean) => void;
   showWelcomeBanner: boolean;
@@ -83,65 +84,6 @@ export type AppState = {
   cancelarCitaReal: (id: string, motivo?: string) => Promise<void>;
 };
 
-const AppContext = createContext<AppState | null>(null);
-
-export const TREATMENTS: Treatment[] = [
-  { id: 'limpieza', name: 'Limpieza Dental Profunda', price: 80, description: 'Profilaxis completa con ultrasonido y pulido', duration: 60 },
-  { id: 'consulta', name: 'Consulta General / Diagnóstico', price: 50, description: 'Evaluación clínica y plan de tratamiento', duration: 30 },
-  { id: 'urgencia', name: 'Urgencia / Dolor Agudo', price: 60, description: 'Atención inmediata para dolor agudo', duration: 45 },
-];
-
-export const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
-
-export const DENTIST_WORK_SCHEDULE: Record<string, Record<string, { active: boolean; start: string; end: string }>> = {
-  '1': {
-    'Lun': { active: true, start: '08:00', end: '17:00' },
-    'Mar': { active: true, start: '08:00', end: '17:00' },
-    'Mié': { active: true, start: '08:00', end: '17:00' },
-    'Jue': { active: true, start: '08:00', end: '17:00' },
-    'Vie': { active: true, start: '08:00', end: '17:00' },
-    'Sáb': { active: true, start: '09:00', end: '14:00' },
-    'Dom': { active: false, start: '', end: '' },
-  },
-  '2': {
-    'Lun': { active: true, start: '09:00', end: '18:00' },
-    'Mar': { active: true, start: '09:00', end: '18:00' },
-    'Mié': { active: true, start: '09:00', end: '18:00' },
-    'Jue': { active: true, start: '09:00', end: '18:00' },
-    'Vie': { active: true, start: '09:00', end: '18:00' },
-    'Sáb': { active: false, start: '', end: '' },
-    'Dom': { active: false, start: '', end: '' },
-  },
-  '3': {
-    'Lun': { active: true, start: '10:00', end: '19:00' },
-    'Mar': { active: true, start: '10:00', end: '19:00' },
-    'Mié': { active: true, start: '10:00', end: '19:00' },
-    'Jue': { active: true, start: '10:00', end: '19:00' },
-    'Vie': { active: true, start: '10:00', end: '19:00' },
-    'Sáb': { active: true, start: '10:00', end: '15:00' },
-    'Dom': { active: false, start: '', end: '' },
-  },
-  '4': {
-    'Lun': { active: true, start: '08:00', end: '17:00' },
-    'Mar': { active: true, start: '08:00', end: '17:00' },
-    'Mié': { active: true, start: '08:00', end: '17:00' },
-    'Jue': { active: true, start: '08:00', end: '17:00' },
-    'Vie': { active: true, start: '08:00', end: '17:00' },
-    'Sáb': { active: true, start: '08:00', end: '13:00' },
-    'Dom': { active: false, start: '', end: '' },
-  },
-};
-
-export const DNI_DATABASE: Record<string, { name: string; age: string }> = {
-  '12345678': { name: 'María González Fernández', age: '28' },
-  '87654321': { name: 'Juan Pérez Rojas', age: '35' },
-  '23456789': { name: 'Ana Torres Quispe', age: '42' },
-  '34567890': { name: 'Luis Ramírez Soto', age: '31' },
-  '45678901': { name: 'Carmen Díaz Vargas', age: '26' },
-  '56789012': { name: 'Pedro Castillo Vega', age: '45' },
-  '67890123': { name: 'Sofía Mendoza Cruz', age: '33' },
-  '78901234': { name: 'Diego Flores Ríos', age: '38' },
-};
 
 function parseTimeToMinutes(time: string): number {
   const parts = time.split(':');
@@ -152,45 +94,6 @@ function formatMinutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
-}
-
-/* ───────── sincronización con el backend ───────── */
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/** Las citas reales tienen id UUID; las simuladas locales usan `request-<timestamp>`. */
-export const isRealId = (id: string) => UUID_RE.test(id);
-
-/**
- * Convierte una cita del backend al modelo que ya usa la UI.
- * `inicio` llega con la zona del consultorio (ej. 2026-10-20T09:00:00-05:00): se lee la hora tal como viene,
- * sin pasarla por Date, para no mostrar la hora del navegador.
- */
-function citaToRequest(c: CitaApi): AppointmentRequest | null {
-  let status: AppointmentRequest['status'];
-  switch (c.estado) {
-    case 'PENDIENTE_CONFIRMACION': status = 'PENDING_APPROVAL'; break;
-    case 'CONFIRMADA':
-    case 'COMPLETADA': status = 'CONFIRMED'; break;
-    case 'REPROGRAMADA': status = 'RESCHEDULE_REQUESTED'; break;
-    default: return null; // PENDIENTE_PAGO (turno retenido), canceladas e inasistencias no se listan como solicitudes
-  }
-  const [y, m, d] = c.inicio.slice(0, 10).split('-').map(Number);
-  const dayLabel = DAY_LABELS[(new Date(y, m - 1, d).getDay() + 6) % 7] as DayLabel; // getDay(): 0 = domingo
-  const minutos = Math.max(15, Math.round((new Date(c.fin).getTime() - new Date(c.inicio).getTime()) / 60000));
-  return {
-    id: c.id,
-    dentistId: c.odontologo.id,
-    patientName: c.paciente?.nombre ?? '',
-    patientDni: '',
-    patientAge: '',
-    patientEmail: c.paciente?.correo ?? '',
-    patientPhone: c.paciente?.telefono ?? '',
-    treatment: { id: c.servicio.id, name: c.servicio.titulo, price: Number(c.precio), description: '', duration: minutos },
-    dayLabel,
-    selectedDay: `${dayLabel} ${d}`,
-    selectedTime: c.inicio.slice(11, 16),
-    status,
-    createdAt: new Date(c.creadoEn).getTime() || Date.now(),
-  };
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -215,7 +118,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [dentistTab, setDentistTab] = useState<DentistTab>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
-  const [session, setSession] = useState<SessionInfo | null>(null);
   const [rememberMe, setRememberMe] = useState(false);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [splashComplete, setSplashComplete] = useState(false);
@@ -223,7 +125,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [selectedDay, setSelectedDay] = useState<string>('Lun 15');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedSlotStart, setSelectedSlotStart] = useState<string | null>(null);
-  const [selectedDentistName, setSelectedDentistName] = useState('');
+  const [selectedDentistName, setSelectedDentistName] = useState<string>('');
   const [agendaLocked, setAgendaLocked] = useState(false);
   const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
   const [reschedulingRequestId, setReschedulingRequestId] = useState<string | null>(null);
@@ -395,6 +297,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ? { ...item, dayLabel, selectedDay, selectedTime, status: 'CONFIRMED', rescheduledBy: 'dentist', createdAt: Date.now() }
         : item
     )));
+    setReschedulingRequestId(null);
   };
 
   // Sesión: el backend (JWT propio) es la única fuente. Supabase solo es la base de datos y su API está cerrada.
@@ -478,8 +381,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setHoldSeconds(600);
   };
 
-  // El backend (AuthController) solo expone /register, /login y /refresh: todavía NO existe /api/auth/google.
-  // Se deja la firma para no romper la UI, pero se informa con claridad en vez de llamar a un endpoint inexistente.
+// El backend (AuthController) solo expone /register, /login y /refresh: todavía NO existe /api/auth/google.
+// Se deja la firma para no romper la UI, pero se informa con claridad en vez de llamar a un endpoint inexistente.
+/* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const loginWithGoogle = async (_idToken: string): Promise<void> => {
     throw new Error('El inicio de sesión con Google aún no está disponible. Usa tu correo y contraseña.');
   };
@@ -503,7 +407,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dentistTab, setDentistTab,
         selectedPatientId, setSelectedPatientId,
         sessionLoading,
-        session,
         rememberMe, setRememberMe,
         showWelcomeBanner, setShowWelcomeBanner,
         splashComplete, setSplashComplete,
@@ -538,14 +441,3 @@ export function AppProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used within AppProvider');
-  return ctx;
-}
-
-export function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}

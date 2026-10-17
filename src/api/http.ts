@@ -164,6 +164,37 @@ export async function api<T = void>(path: string, opts: RequestOptions = {}): Pr
     throw new ApiError(res.status, mensaje);
   }
 
-  if (res.status === 204) return undefined as T;
-  return camelize<T>(await res.json());
+  // 202/204/205 (p. ej. logout, recuperar-password) llegan sin cuerpo
+  if (res.status === 204 || res.status === 205) return undefined as T;
+  const texto = await res.text();
+  if (!texto) return undefined as T;
+  return camelize<T>(JSON.parse(texto));
+}
+
+/**
+ * Descarga un archivo binario protegido (p. ej. la constancia PDF de una cita) con el token de sesión.
+ * Un <a href> normal no sirve: el access token vive en memoria y no viaja solo.
+ */
+export async function apiBlob(path: string, query?: Query): Promise<Blob> {
+  const doFetch = () =>
+    fetch(buildUrl(path, query), { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
+
+  let res: Response;
+  try {
+    res = await doFetch();
+    if (res.status === 401 && (await tryRefresh())) res = await doFetch();
+  } catch {
+    throw new ApiError(0, 'No pudimos conectar con el servidor. Revisa tu internet e inténtalo de nuevo.');
+  }
+  if (!res.ok) {
+    let mensaje = 'No se pudo descargar el archivo';
+    try {
+      const err = (await res.json()) as { mensaje?: string };
+      if (err.mensaje) mensaje = err.mensaje;
+    } catch {
+      /* sin JSON */
+    }
+    throw new ApiError(res.status, mensaje);
+  }
+  return res.blob();
 }

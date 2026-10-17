@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Calendar, Clock, Shield, Star } from 'lucide-react';
-import { DENTIST_AVATAR, DENTIST_NAME } from '../../lib/dentistData';
 import { formatTime } from '../../store';
 import type { Treatment } from '../../types';
 
@@ -13,6 +12,10 @@ interface Props {
   isHoldActive: boolean;
   guarantee: number;
   balance: number;
+  dentistName: string;
+  dentistImage?: string | null;
+  /** Duración total de la ventana de pago (para el anillo del contador). */
+  totalSeconds?: number;
 }
 
 export function AppointmentSummary({
@@ -23,6 +26,9 @@ export function AppointmentSummary({
   isHoldActive,
   guarantee,
   balance,
+  dentistName,
+  dentistImage,
+  totalSeconds = 900,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
 
@@ -36,11 +42,13 @@ export function AppointmentSummary({
       >
         {/* Dentist avatar with COP badge */}
         <div className="relative flex-shrink-0">
-          <img
-            src={DENTIST_AVATAR}
-            alt={`Dr. ${DENTIST_NAME}`}
-            className="w-12 h-12 rounded-2xl object-cover"
-          />
+          {dentistImage ? (
+            <img src={dentistImage} alt={dentistName} className="w-12 h-12 rounded-2xl object-cover" />
+          ) : (
+            <div className="w-12 h-12 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center font-bold text-sm" aria-label={dentistName}>
+              {dentistName.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'OD'}
+            </div>
+          )}
           <span className="absolute -bottom-1 -right-1 bg-primary-500 text-white text-[9px] font-bold px-1 rounded-full leading-4">
             COP
           </span>
@@ -48,14 +56,14 @@ export function AppointmentSummary({
 
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-slatey-900 truncate">
-            Dr. {DENTIST_NAME}
+            {dentistName}
           </p>
           <p className="text-xs text-slatey-500 truncate">{treatment.name}</p>
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
           {isHoldActive && (
-            <CountdownPill holdSeconds={holdSeconds} />
+            <CountdownPill holdSeconds={holdSeconds} totalSeconds={totalSeconds} />
           )}
           <motion.div
             animate={{ rotate: expanded ? 180 : 0 }}
@@ -112,7 +120,7 @@ export function AppointmentSummary({
                 <div className="flex justify-between text-xs">
                   <span className="text-slatey-500 flex items-center gap-1">
                     <Shield className="w-3 h-3 text-success-500" />
-                    Depósito de garantía (20%)
+                    Depósito de reserva
                   </span>
                   <span className="font-bold text-success-600">S/ {guarantee.toFixed(2)}</span>
                 </div>
@@ -136,8 +144,8 @@ export function AppointmentSummary({
   );
 }
 
-function CountdownPill({ holdSeconds }: { holdSeconds: number }) {
-  const pct = (holdSeconds / 600) * 100.53;
+function CountdownPill({ holdSeconds, totalSeconds }: { holdSeconds: number; totalSeconds: number }) {
+  const pct = (holdSeconds / Math.max(1, totalSeconds)) * 100.53;
   const urgent = holdSeconds < 120;
   return (
     <div

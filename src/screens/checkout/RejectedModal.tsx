@@ -9,6 +9,8 @@ interface Props {
   onSwitchMethod: (m: PayMethod) => void;
   currentMethod: PayMethod;
   holdSeconds: number;
+  /** Mensaje del backend; si no viene se usa el texto genérico por método. */
+  message?: string | null;
 }
 
 const METHOD_LABELS: Record<PayMethod, string> = {
@@ -23,7 +25,7 @@ const ALTERNATIVES: Record<PayMethod, PayMethod[]> = {
   card: ['yape', 'plin'],
 };
 
-export function RejectedModal({ open, onRetry, onSwitchMethod, currentMethod, holdSeconds }: Props) {
+export function RejectedModal({ open, onRetry, onSwitchMethod, currentMethod, holdSeconds, message }: Props) {
   const alternatives = ALTERNATIVES[currentMethod];
   const mins = Math.ceil(holdSeconds / 60);
 
@@ -64,7 +66,7 @@ export function RejectedModal({ open, onRetry, onSwitchMethod, currentMethod, ho
                   El pago no fue aprobado
                 </h3>
                 <p id="reject-desc" className="text-sm text-slatey-500 mt-1">
-                  {currentMethod === 'card'
+                  {message ? message : currentMethod === 'card'
                     ? 'Tu tarjeta fue rechazada. Verifica los datos o usa otro método.'
                     : `No se recibió la confirmación de ${METHOD_LABELS[currentMethod]}. Revisa el número de operación.`}
                 </p>
