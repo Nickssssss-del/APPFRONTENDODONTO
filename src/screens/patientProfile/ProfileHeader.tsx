@@ -103,13 +103,3 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
   );
 }
 
-function VerifiedBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success-50 border border-success-100 text-success-700 text-[10px] font-semibold">
-      <CheckCircle2 className="w-2.5 h-2.5" />
-      {icon}
-      {label}
-    </span>
-  );
-}
-
