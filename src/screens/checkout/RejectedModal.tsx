@@ -107,7 +107,7 @@ export function RejectedModal({ open, onRetry, onSwitchMethod, currentMethod, ho
                 ))}
               </div>
 
-              <p className="text-[11px] text-slatey-400">
+              <p className="text-[11px] text-slatey-500">
                 ¿Sigues con problemas?{' '}
                 <a
                   href="mailto:soporte@odontosystem.pe"

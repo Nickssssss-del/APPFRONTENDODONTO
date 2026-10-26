@@ -57,9 +57,9 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
             <button
               onClick={() => fileRef.current?.click()}
               aria-label="Cambiar foto de perfil"
-              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary-500 border-2 border-white flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors"
+              className="absolute -bottom-2 -right-2 w-11 h-11 rounded-full bg-primary-500 border-2 border-white flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors"
             >
-              <Camera className="w-3.5 h-3.5 text-white" />
+              <Camera className="w-4 h-4 text-white" aria-hidden="true" />
             </button>
             {/* Hidden file input — accepts images for circular crop */}
             <input
@@ -67,6 +67,7 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
               type="file"
               accept="image/*"
               className="sr-only"
+              tabIndex={-1}
               aria-hidden="true"
               onChange={handleFileChange}
             />
@@ -92,9 +93,9 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
             {/* Verified badges */}
             <div className="flex flex-wrap gap-1.5 mt-2">
               {user.phone && (
-                <VerifiedBadge icon={<Phone className="w-3 h-3" />} label="Teléfono verificado" />
+                <VerifiedBadge icon={<Phone className="w-3 h-3" />} label="Teléfono registrado" />
               )}
-              {user.email && (
+              {user.email && user.emailVerified && (
                 <VerifiedBadge icon={<Mail className="w-3 h-3" />} label="Correo verificado" />
               )}
             </div>

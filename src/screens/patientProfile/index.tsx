@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState } from 'react';
 import { useApp } from '@/storeHooks';
 import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';
@@ -13,6 +12,7 @@ import { ResumenTab } from './ResumenTab';
 import { HistorialTab } from './HistorialTab';
 import { ComprobantesTab } from './ComprobantesTab';
 import { SettingsSection } from './SettingsSection';
+import { MisReclamos } from '@/components/reclamos/MisReclamos';
 import type { ProfileTab } from './types';
 
 export default function PatientProfileScreen() {
@@ -51,7 +51,7 @@ export default function PatientProfileScreen() {
     <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50">
       <div className="flex-shrink-0 sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
-          <button onClick={() => setScreen('patientDashboard')} aria-label="Volver al inicio" className="p-2 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors">
+          <button onClick={() => setScreen('patientDashboard')} aria-label="Volver al inicio" className="p-2.5 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors">
             <ArrowLeft className="w-5 h-5 text-slatey-700" />
           </button>
           <h2 className="text-lg font-bold text-slatey-900 font-display flex-1">Mi perfil</h2>
@@ -77,13 +77,18 @@ export default function PatientProfileScreen() {
                     onCancel={cancelarCitaReal}
                     onAppeal={() => setScreen('patientDashboard')}
                   />
-                  <SettingsSection onLogout={handleLogout} />
+                  <SettingsSection onLogout={handleLogout} onCuentaEliminada={handleLogout} />
                 </>
               )}
               {tab === 'historial' && (
                 <HistorialTab entries={historias.data ?? []} loading={historias.loading} error={historias.error} onRetry={historias.reload} onReserve={() => setScreen('marketplace')} />
               )}
               {tab === 'comprobantes' && <ComprobantesTab citas={ordenadas} onReserve={() => setScreen('marketplace')} />}
+              {tab === 'reclamos' && (
+                <div id="panel-reclamos" role="tabpanel" aria-labelledby="tab-reclamos">
+                  <MisReclamos citas={ordenadas} />
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
         </div>

@@ -10,6 +10,7 @@ import SmartImage from '@/components/SmartImage';
 import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';
 import { actualizarYo } from '@/api/usuarios';
+import { CuentaSection } from '@/components/cuenta/CuentaSection';
 import {
   agregarFotoConsultorio, eliminarFotoConsultorio, listarDocumentos, listarFotosConsultorio, subirDocumento, subirFotoPerfil,
   validarImagen, type TipoDocumento,
@@ -386,7 +387,7 @@ export default function Profile() {
         <Input label="Teléfono" value={telefono} onChange={setTelefono} type="tel" icon={<Phone className="w-5 h-5" />} />
         <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-700 min-w-0">
           <Mail className="w-4 h-4 text-slatey-400 flex-shrink-0" /> <span className="truncate">{user.email}</span>
-          <span className="ml-auto text-[10px] text-slatey-400 flex-shrink-0">No editable</span>
+          <span className="ml-auto text-[10px] text-slatey-500 flex-shrink-0">No editable</span>
         </div>
         <div>
           <p className="block text-sm font-semibold text-slatey-700 mb-1.5">Especialidades</p>
@@ -434,7 +435,7 @@ export default function Profile() {
             <p className="text-xs font-semibold text-slatey-700">Confirmar reservas manualmente</p>
             <p className="text-[11px] text-slatey-500">Si lo activas, cada reserva pagada espera tu confirmación.</p>
           </div>
-          <Toggle checked={confirmacionManual} onChange={setConfirmacionManual} />
+          <Toggle checked={confirmacionManual} onChange={setConfirmacionManual} label="Confirmar reservas manualmente" />
         </div>
         <Mensaje m={msgPerfil} />
         <Button fullWidth size="lg" loading={guardandoPerfil} onClick={guardarPerfil}><Check className="w-5 h-5" /> Guardar cambios</Button>
@@ -515,7 +516,7 @@ export default function Profile() {
             </div>
           ))}
           <input ref={galeriaInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={agregarFoto} />
-          <button onClick={() => galeriaInput.current?.click()} disabled={subiendo || listaFotos.length >= 10} className="aspect-square rounded-xl border-2 border-dashed border-slatey-200 flex flex-col items-center justify-center text-slatey-400 hover:border-primary-300 hover:text-primary-500 transition-colors disabled:opacity-50">
+          <button onClick={() => galeriaInput.current?.click()} disabled={subiendo || listaFotos.length >= 10} className="aspect-square rounded-xl border-2 border-dashed border-slatey-200 flex flex-col items-center justify-center text-slatey-500 hover:border-primary-300 hover:text-primary-500 transition-colors disabled:opacity-50">
             <Plus className="w-6 h-6" />
             <span className="text-xs font-medium mt-1">{subiendo ? 'Subiendo…' : 'Agregar'}</span>
           </button>
@@ -537,14 +538,14 @@ export default function Profile() {
                   <button onClick={() => toggleDia(d.api)} aria-label={`${activo ? 'Desactivar' : 'Activar'} ${d.label}`} aria-pressed={activo} className={`w-10 h-6 rounded-full flex items-center transition-colors flex-shrink-0 ${activo ? 'bg-primary-500' : 'bg-slatey-300'}`}>
                     <motion.div layout transition={{ type: 'spring', stiffness: 500, damping: 30 }} className={`w-5 h-5 rounded-full bg-white shadow-md ${activo ? 'ml-auto mr-0.5' : 'ml-0.5'}`} />
                   </button>
-                  <span className={`text-sm font-semibold flex-1 ${activo ? 'text-slatey-900' : 'text-slatey-400'}`}>{d.label}</span>
-                  {!activo && <span className="text-xs text-slatey-400">No disponible</span>}
+                  <span className={`text-sm font-semibold flex-1 ${activo ? 'text-slatey-900' : 'text-slatey-500'}`}>{d.label}</span>
+                  {!activo && <span className="text-xs text-slatey-500">No disponible</span>}
                   {activo && <button onClick={() => agregarTramo(d.api)} className="text-xs font-semibold text-primary-600 hover:underline">+ Tramo</button>}
                 </div>
                 {tramos.map((t, i) => (
                   <div key={i} className="flex items-center gap-2 mt-2 pl-[52px]">
                     <input type="time" aria-label={`${d.label} inicio`} value={t.start} onChange={(e) => cambiarTramo(d.api, i, 'start', e.target.value)} className="px-2.5 py-1.5 rounded-lg border border-slatey-200 bg-white text-xs font-semibold text-slatey-700 focus:border-primary-400 focus:outline-none" />
-                    <span className="text-xs text-slatey-400">—</span>
+                    <span className="text-xs text-slatey-500">—</span>
                     <input type="time" aria-label={`${d.label} fin`} value={t.end} onChange={(e) => cambiarTramo(d.api, i, 'end', e.target.value)} className="px-2.5 py-1.5 rounded-lg border border-slatey-200 bg-white text-xs font-semibold text-slatey-700 focus:border-primary-400 focus:outline-none" />
                     {tramos.length > 1 && <button onClick={() => quitarTramo(d.api, i)} aria-label="Quitar tramo" className="p-1 rounded hover:bg-error-50"><X className="w-3.5 h-3.5 text-error-500" /></button>}
                   </div>
@@ -583,7 +584,9 @@ export default function Profile() {
         <p className="text-[11px] text-slatey-500">Máximo 60 días. Las citas ya reservadas en ese rango se cancelan con reembolso del 100 %.</p>
       </Seccion>
 
-      <button onClick={cerrarSesion} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-error-50 border-2 border-error-100 text-error-600 font-bold text-sm hover:bg-error-100 transition-colors mb-4">
+      <CuentaSection onEliminada={cerrarSesion} />
+
+      <button onClick={cerrarSesion} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-error-50 border-2 border-error-100 text-error-700 font-bold text-sm hover:bg-error-100 transition-colors mb-4">
         <LogOut className="w-4 h-4" /> Cerrar sesión
       </button>
     </div>

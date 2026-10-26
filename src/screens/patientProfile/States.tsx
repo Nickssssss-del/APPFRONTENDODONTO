@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { Stethoscope, AlertTriangle } from 'lucide-react';
 
 /** Skeleton block — reusable pulse placeholder */
 export function Skeleton({ className = '', style }: { className?: string; style?: CSSProperties }) {
@@ -45,7 +46,7 @@ export function EmptyState({ onReserve }: { onReserve: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
       <div className="w-20 h-20 rounded-full bg-primary-50 flex items-center justify-center mb-5">
-        <span className="text-4xl" aria-hidden="true">🦷</span>
+        <Stethoscope className="h-9 w-9 text-primary-600" aria-hidden="true" />
       </div>
       <h3 className="text-lg font-bold text-slatey-900 font-display mb-2">
         ¡Aún no tienes historial!
@@ -69,7 +70,7 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
       <div className="w-16 h-16 rounded-full bg-error-50 flex items-center justify-center mb-4">
-        <span className="text-3xl" aria-hidden="true">⚠️</span>
+        <AlertTriangle className="h-7 w-7 text-error-600" aria-hidden="true" />
       </div>
       <h3 className="text-base font-bold text-slatey-900 mb-1">
         No se pudo cargar la información

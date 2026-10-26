@@ -91,7 +91,7 @@ export default function WelcomeSplash({ onFinish }: WelcomeSplashProps) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.9 }}
-        className="text-xs text-slatey-400 mt-4"
+        className="text-xs text-slatey-500 mt-4"
       >
         Redirigiendo automáticamente...
       </motion.p>

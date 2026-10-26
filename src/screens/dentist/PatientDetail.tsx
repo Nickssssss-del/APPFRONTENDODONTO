@@ -186,7 +186,7 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
           >
             <div>
               <p className="text-sm font-bold text-slatey-900">{h.servicio}</p>
-              <p className="text-[11px] text-slatey-400">{diaLima(h.fechaCita)} · {horaLima(h.fechaCita)}</p>
+              <p className="text-[11px] text-slatey-500">{diaLima(h.fechaCita)} · {horaLima(h.fechaCita)}</p>
             </div>
             <Bloque icon={<Stethoscope className="w-3.5 h-3.5" />} titulo="Diagnóstico" texto={h.diagnostico} />
             <Bloque icon={<Pill className="w-3.5 h-3.5" />} titulo="Tratamiento" texto={h.tratamiento} />

@@ -168,8 +168,8 @@ export default function DiagnosticoConexion() {
         <h2 className="mb-2 text-sm font-bold">Probar inicio de sesión</h2>
         {!sesion ? (
           <div className="space-y-2">
-            <input value={correo} onChange={(e) => setCorreo(e.target.value)} placeholder="correo" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
-            <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="contraseña" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <input value={correo} onChange={(e) => setCorreo(e.target.value)} aria-label="Correo" autoComplete="email" placeholder="correo" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+            <input value={password} onChange={(e) => setPassword(e.target.value)} aria-label="Contraseña" autoComplete="current-password" type="password" placeholder="contraseña" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
             <button onClick={() => void probarLogin()} disabled={cargando} className="w-full rounded-xl bg-teal-600 py-2 text-sm font-bold text-white disabled:opacity-60">
               {cargando ? 'Probando…' : 'Iniciar sesión y leer mi perfil'}
             </button>

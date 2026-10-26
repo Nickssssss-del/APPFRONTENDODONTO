@@ -94,6 +94,8 @@ export type Liquidacion = {
 };
 export type MisIngresos = { enCustodia: number; pagado: number; devueltoAPacientes: number; liquidaciones: Liquidacion[] };
 export const misIngresos = (signal?: AbortSignal) => api<MisIngresos>('/api/odontologos/yo/liquidaciones', { signal });
+/** Las mismas liquidaciones en Excel (.xlsx). */
+export const descargarLiquidacionesExcel = () => apiBlob('/api/odontologos/yo/liquidaciones/excel');
 
 /* ───────── Historias clínicas ───────── */
 export type Historia = {
@@ -139,6 +141,10 @@ export type Apelacion = {
   notaResolucion?: string | null;
   creadoEn: string;
   resueltoEn?: string | null;
+  /** Enlace firmado al certificado (vence a los 10 min). Solo lo recibe el odontólogo. */
+  certificadoUrl?: string | null;
+  certificadoExpiraEn?: string | null;
+  strikesDelPaciente?: number | null;
 };
 /** Certificado: PDF, JPG o PNG de hasta 5 MB. Solo citas INASISTENCIA_PENALIZADA de los últimos 7 días. */
 export const apelarInasistencia = (citaId: string, certificado: File) => {
@@ -147,6 +153,35 @@ export const apelarInasistencia = (citaId: string, certificado: File) => {
   return api<Apelacion>(`/api/citas/${citaId}/apelacion`, { method: 'POST', form });
 };
 export const miApelacion = (citaId: string) => api<Apelacion>(`/api/citas/${citaId}/apelacion`);
+
+/* Odontólogo: apelaciones de inasistencia que le enviaron sus pacientes */
+export const apelacionesRecibidas = (signal?: AbortSignal) => api<Apelacion[]>('/api/odontologos/yo/apelaciones', { signal });
+/** aprobar=true: la inasistencia estaba justificada (se quita el strike). Nota opcional (máx. 500). */
+export const resolverApelacion = (apelacionId: string, aprobar: boolean, nota?: string) =>
+  api<Apelacion>(`/api/odontologos/yo/apelaciones/${apelacionId}`, { method: 'PATCH', body: { aprobar, nota: nota || undefined } });
+
+/* Odontólogo: pacientes que reportaron que no los atendió */
+export type ReporteAusencia = {
+  id: string;
+  citaId: string;
+  paciente: string;
+  servicio: string;
+  fechaCita: string;
+  estado: 'PENDIENTE' | 'CONFIRMADO' | 'RECHAZADO' | 'EN_RECLAMO';
+  distanciaMetros?: number | null;
+  respuestaOdontologo?: string | null;
+  historiaRegistrada: boolean;
+  responderAntes: string;
+  creadoEn: string;
+  resueltoEn?: string | null;
+};
+export const reportesAusencia = (signal?: AbortSignal) => api<ReporteAusencia[]>('/api/odontologos/yo/reportes-ausencia', { signal });
+/** atendi=false admite la falta (reembolso al paciente); atendi=true exige la historia clínica registrada como prueba. */
+export const responderReporteAusencia = (reporteId: string, atendi: boolean, nota?: string) =>
+  api<ReporteAusencia>(`/api/odontologos/yo/reportes-ausencia/${reporteId}/respuesta`, {
+    method: 'POST',
+    body: { atendi, nota: nota || undefined },
+  });
 
 export type CitaPorResenar = { citaId: string; odontologoId: string; odontologo: string; servicio: string; atendidaEl: string };
 export const citasPorResenar = (signal?: AbortSignal) => api<CitaPorResenar[]>('/api/citas/por-resenar', { signal });
@@ -170,7 +205,22 @@ export const resenasDeOdontologo = (id: string, pagina = 0, signal?: AbortSignal
 /** Constancia del depósito pagado (PDF). Devuelve el Blob para descargarlo con el token de sesión. */
 export const descargarConstancia = (citaId: string) => apiBlob(`/api/citas/${citaId}/constancia`);
 
-export function guardarArchivo(blob: Blob, nombre: string) {
+/**
+ * Guarda un archivo descargado. En el navegador usa un <a download>; en Android (Capacitor) el WebView ignora
+ * ese atributo, así que se escribe en la caché de la app y se abre el menú "Compartir" para guardarlo o abrirlo.
+ */
+export async function guardarArchivo(blob: Blob, nombre: string) {
+  const { Capacitor } = await import('@capacitor/core');
+  if (Capacitor.isNativePlatform()) {
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+      import('@capacitor/filesystem'),
+      import('@capacitor/share'),
+    ]);
+    const data = await blobABase64(blob);
+    const { uri } = await Filesystem.writeFile({ path: nombre, data, directory: Directory.Cache });
+    await Share.share({ title: nombre, files: [uri] });
+    return;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -179,6 +229,15 @@ export function guardarArchivo(blob: Blob, nombre: string) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+function blobABase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader();
+    lector.onload = () => resolve(String(lector.result).split(',')[1] ?? '');
+    lector.onerror = () => reject(lector.error);
+    lector.readAsDataURL(blob);
+  });
 }
 
 export type { ItemCatalogo };

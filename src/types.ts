@@ -69,6 +69,8 @@ export type UserProfile = {
   age: string;
   /** foto_perfil_url de GET /api/usuarios/yo */
   photoUrl?: string;
+  /** correo_verificado de GET /api/usuarios/yo (OTP de verificación de correo). */
+  emailVerified?: boolean;
 };
 
 export type DentistLocation = {
@@ -91,7 +93,7 @@ export type RecoverMethod = 'email' | 'phone';
 
 export type DayLabel = 'Lun' | 'Mar' | 'Mié' | 'Jue' | 'Vie' | 'Sáb' | 'Dom';
 
-export type DentistTab = 'dashboard' | 'agenda' | 'patients' | 'history';
+export type DentistTab = 'dashboard' | 'agenda' | 'patients' | 'gestion' | 'history';
 
 export type SessionInfo = {
   user: { id: string; email?: string };
