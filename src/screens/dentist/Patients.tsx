@@ -7,8 +7,8 @@ import { agendaOdontologo } from '@/api/citas';
 import { agruparPacientes, iniciales } from '@/lib/pacientes';
 import { diaLima, fechaIsoLima, horaLima, sumarDias } from '@/lib/format';
 
-const DIAS_ATRAS = 180;
-const DIAS_ADELANTE = 60;
+const DIAS_ATRAS = 0;
+const DIAS_ADELANTE = 30;
 
 type PatientsProps = {
   onGoToPatient: (pacienteId: string) => void;

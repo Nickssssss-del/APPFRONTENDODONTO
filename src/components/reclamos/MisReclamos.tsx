@@ -59,7 +59,7 @@ export function MisReclamos({ citas, citaInicial }: { citas: CitaApi[]; citaInic
         </div>
       ) : (lista.data ?? []).length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slatey-200 bg-white p-6 text-center text-xs text-slatey-500">
-          No has registrado consultas ni reclamos.
+          No cuentas con reclamos registrados.
         </p>
       ) : (
         <ul className="space-y-3">

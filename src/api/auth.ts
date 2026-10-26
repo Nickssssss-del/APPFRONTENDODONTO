@@ -25,8 +25,8 @@ export type RegistroInput = {
   aceptaPrivacidad: boolean;
 };
 
-export async function login(correo: string, password: string): Promise<AuthSession> {
-  const s = await api<AuthSession>('/api/auth/login', { method: 'POST', body: { correo, password }, auth: false });
+export async function login(correo: string, password: string, signal?: AbortSignal): Promise<AuthSession> {
+  const s = await api<AuthSession>('/api/auth/login', { method: 'POST', body: { correo, password }, auth: false, signal });
   setTokens(s.accessToken, s.refreshToken);
   return s;
 }

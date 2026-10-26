@@ -7,6 +7,8 @@ import { activarPush, desactivarPush } from './lib/push';
 import { agendaOdontologo, cancelarCita, confirmarCita, misCitas, pagarDeposito, reservarCita, type CitaApi, type MetodoPago } from './api/citas';
 import { TREATMENTS, DENTIST_WORK_SCHEDULE, isRealId } from './constants';
 import { AppContext } from './storeContext';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { fechaIsoLima, sumarDias } from '@/lib/format';
 
 export type AppState = {
   role: Role;
@@ -50,6 +52,8 @@ export type AppState = {
   setSplashComplete: (b: boolean) => void;
   selectedDentistId: string | null;
   setSelectedDentistId: (id: string | null) => void;
+  appealCitaId: string | null;
+  setAppealCitaId: (id: string | null) => void;
   selectedDay: string;
   setSelectedDay: (d: string) => void;
   selectedTime: string | null;
@@ -131,6 +135,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [splashComplete, setSplashComplete] = useState(false);
   const [selectedDentistId, setSelectedDentistId] = useState<string | null>(null);
+  const [appealCitaId, setAppealCitaId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('Lun 15');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedSlotStart, setSelectedSlotStart] = useState<string | null>(null);
@@ -387,6 +392,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         showWelcomeBanner, setShowWelcomeBanner,
         splashComplete, setSplashComplete,
         selectedDentistId, setSelectedDentistId,
+        appealCitaId, setAppealCitaId,
         selectedDay, setSelectedDay,
         selectedTime, setSelectedTime,
         selectedSlotStart, setSelectedSlotStart,

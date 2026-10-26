@@ -13,7 +13,8 @@ export type Screen =
   | 'chatbot'
   | 'dentistProfile'
   | 'patientProfile'
-  | 'confirmarCita';
+  | 'confirmarCita'
+  | 'apelacion';
 
 export type Treatment = {
   id: string;

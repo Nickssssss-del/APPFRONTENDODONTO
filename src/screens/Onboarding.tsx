@@ -158,6 +158,9 @@ export default function Onboarding() {
     }
 
     setLoading(true);
+    // timeout 10s for login/register
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
       const session = isRegister
         ? await register({
@@ -171,11 +174,16 @@ export default function Onboarding() {
             numeroColegiatura: role === 'dentist' ? copNumber.trim() : undefined,
             aceptaPrivacidad: true,
           })
-        : await login(email.trim(), password);
+        : await login(email.trim(), password, controller.signal);
       await entrar(session);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo completar la solicitud.');
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setError('El servidor tardó en responder');
+      } else {
+        setError(err instanceof ApiError ? err.message : 'No se pudo completar la solicitud.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
@@ -359,8 +367,7 @@ export default function Onboarding() {
             </div>
             </>)}
 
-            {/* Campo N.º de Colegiatura COP (Solo cuando Soy Odontólogo está activo) */}
-            {role === 'dentist' && (
+            {isRegister && role === 'dentist' && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}

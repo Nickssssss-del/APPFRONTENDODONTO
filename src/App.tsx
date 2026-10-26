@@ -15,6 +15,7 @@ import Chatbot from './screens/Chatbot';
 import DentistProfile from './screens/DentistProfile';
 import PatientProfile from './screens/PatientProfile';
 import ConfirmarCita from './screens/ConfirmarCita';
+import ApelacionScreen from './screens/ApelacionScreen';
 import DiagnosticoConexion from './screens/DiagnosticoConexion';
 import SettingsModal from './components/SettingsModal';
 import PatientBottomNav from './components/PatientBottomNav';
@@ -215,6 +216,7 @@ function AppContent() {
                 {screen === 'dentistProfile' && <DentistProfile />}
                 {screen === 'patientProfile' && <PatientProfile />}
                 {screen === 'confirmarCita' && <ConfirmarCita />}
+                {screen === 'apelacion' && <ApelacionScreen />}
               </motion.div>
             </AnimatePresence>
           </ErrorBoundary>

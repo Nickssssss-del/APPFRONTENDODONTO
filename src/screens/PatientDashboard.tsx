@@ -13,6 +13,7 @@ import { buscarOdontologos } from '../api/catalog';
 import { apelarInasistencia, miReputacion } from '../api/panel';
 import { diaLima, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '../lib/format';
 import type { CitaApi } from '../api/citas';
+import PatientMap from '@/components/PatientMap';
 
 const PLAZO_APELACION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -158,6 +159,15 @@ export default function PatientDashboard() {
             <Button size="sm" onClick={() => { setSelectedDentistId(null); setScreen('marketplace'); }}>Reservar cita <ArrowRight className="w-4 h-4" /></Button>
           </div>
         )}
+
+        {/* Mapa interactivo de odontólogos cercanos */}
+        <div className="mb-5 h-64 w-full">
+          <PatientMap
+            dentists={lista}
+            center={coords ?? { lat: -12.0464, lng: -77.0428 }}
+            zoom={12}
+          />
+        </div>
 
         {/* Odontólogos (reales) */}
         <div>

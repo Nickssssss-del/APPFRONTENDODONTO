@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '@/storeHooks';
@@ -22,6 +22,13 @@ export default function PatientProfileScreen() {
 
   const historias = useAsync((signal) => misHistorias(signal), []);
   const reputacion = useAsync((signal) => miReputacion(signal), []);
+
+  // Recargar historial cada vez que se abre la pestaña
+  useEffect(() => {
+    if (tab === 'historial') {
+      historias.reload();
+    }
+  }, [tab, historias]);
 
   const ordenadas = useMemo(() => [...citas].sort((a, b) => b.inicio.localeCompare(a.inicio)), [citas]);
 

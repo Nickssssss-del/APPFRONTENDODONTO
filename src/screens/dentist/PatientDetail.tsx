@@ -9,8 +9,8 @@ import { historiasEscritasPara, registrarHistoria, type Historia } from '@/api/p
 import { agruparPacientes, iniciales } from '@/lib/pacientes';
 import { diaLima, fechaIsoLima, horaLima, sumarDias } from '@/lib/format';
 
-const DIAS_ATRAS = 365;
-const DIAS_ADELANTE = 60;
+const DIAS_ATRAS = 0;
+const DIAS_ADELANTE = 30;
 
 type PatientDetailProps = {
   /** id del paciente (usuario) tal como lo devuelve el backend en cita.paciente.id */
