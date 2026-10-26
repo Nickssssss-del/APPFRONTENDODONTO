@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Camera, CheckCircle2, Mail, Phone, Shield } from 'lucide-react';
+import { Camera, Shield } from 'lucide-react';
 import SmartImage from '@/components/SmartImage';
 import type { UserProfile } from '@/types';
 
@@ -88,30 +88,10 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
                 DNI {maskDni(user.dni)}
               </span>
             </div>
-
-            {/* Verified badges */}
-            <div className="flex flex-wrap gap-1.5 mt-2">
-              {user.phone && (
-                <VerifiedBadge icon={<Phone className="w-3 h-3" />} label="Teléfono verificado" />
-              )}
-              {user.email && (
-                <VerifiedBadge icon={<Mail className="w-3 h-3" />} label="Correo verificado" />
-              )}
-            </div>
           </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function VerifiedBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success-50 border border-success-100 text-success-700 text-[10px] font-semibold">
-      <CheckCircle2 className="w-2.5 h-2.5" />
-      {icon}
-      {label}
-    </span>
   );
 }
 
