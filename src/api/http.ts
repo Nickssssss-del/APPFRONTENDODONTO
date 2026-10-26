@@ -70,18 +70,33 @@ export class ApiError extends Error {
 /* ───────── network error handling ───────── */
 let consecutiveNetworkErrors = 0;
 let networkDown = false;
+let networkDownSince = 0;
 const MAX_NETWORK_ERRORS = 3;
+/** Pasado este tiempo en modo offline se permite un intento real para comprobar si volvió la conexión. */
+const NETWORK_RETRY_AFTER_MS = 5000;
 
 function markNetworkSuccess() {
   consecutiveNetworkErrors = 0;
   networkDown = false;
 }
 
+/** true solo mientras estamos en modo offline y aún no toca reintentar. */
+function isNetworkBlocked(): boolean {
+  return networkDown && Date.now() - networkDownSince < NETWORK_RETRY_AFTER_MS;
+}
+
+if (typeof window !== 'undefined') {
+  // Al recuperar internet el dispositivo, salimos del modo offline de inmediato.
+  window.addEventListener('online', markNetworkSuccess);
+}
+
 function markNetworkError() {
   consecutiveNetworkErrors += 1;
   if (consecutiveNetworkErrors >= MAX_NETWORK_ERRORS) {
+    const wasDown = networkDown;
     networkDown = true;
-    window.dispatchEvent(new CustomEvent('odonto:network-down'));
+    networkDownSince = Date.now();
+    if (!wasDown) window.dispatchEvent(new CustomEvent('odonto:network-down'));
   }
 }
 
@@ -157,7 +172,7 @@ export async function api<T = void>(path: string, opts: RequestOptions = {}): Pr
     });
   };
 
-  if (networkDown) {
+  if (isNetworkBlocked()) {
     throw new ApiError(0, 'Sin conexión con el servidor (modo offline).');
   }
 
@@ -201,7 +216,7 @@ export async function api<T = void>(path: string, opts: RequestOptions = {}): Pr
  * Un <a href> normal no sirve: el access token vive en memoria y no viaja solo.
  */
 export async function apiBlob(path: string, query?: Query): Promise<Blob> {
-  if (networkDown) {
+  if (isNetworkBlocked()) {
     throw new ApiError(0, 'Sin conexión con el servidor (modo offline).');
   }
 
