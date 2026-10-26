@@ -14,7 +14,7 @@ function DebugResetTour() {
   };
   return (
     <div className="pt-4 border-t border-slatey-100">
-      <p className="text-xs text-slatey-400 text-center mb-3 uppercase tracking-wide">Debug</p>
+      <p className="text-xs text-slatey-500 text-center mb-3 uppercase tracking-wide">Debug</p>
       <Button variant="outline" fullWidth onClick={resetTour} className="bg-error-50 border-error-200 text-error-600 hover:bg-error-100">
         <Bug className="w-4 h-4 mr-2" /> Resetear tour (paciente + doctor)
       </Button>
@@ -73,7 +73,7 @@ export default function SettingsModal() {
         </div>
 
         <div className="space-y-3">
-          <p className="text-xs font-bold text-slatey-400 uppercase tracking-wide px-1">Contacto</p>
+          <p className="text-xs font-bold text-slatey-500 uppercase tracking-wide px-1">Contacto</p>
           <Input label="Teléfono" value={telefono} onChange={setTelefono} type="tel" icon={<Phone className="w-5 h-5" />} />
           {msg && <p role={msg.ok ? 'status' : 'alert'} className={`text-xs font-medium ${msg.ok ? 'text-success-600' : 'text-error-600'}`}>{msg.texto}</p>}
           <Button fullWidth loading={guardando} disabled={!telefono.trim() || telefono.trim() === user.phone} onClick={guardar}>
@@ -82,7 +82,7 @@ export default function SettingsModal() {
           {role === 'dentist' && <p className="text-[11px] text-slatey-500">Los datos del consultorio, horarios y cuenta de abono se editan en la pestaña «Perfil».</p>}
         </div>
 
-        <button onClick={cerrarSesion} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-error-50 border-2 border-error-100 text-error-600 font-bold text-sm hover:bg-error-100 transition-colors">
+        <button onClick={cerrarSesion} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-error-50 border-2 border-error-100 text-error-700 font-bold text-sm hover:bg-error-100 transition-colors">
           <LogOut className="w-4 h-4" /> Cerrar sesión
         </button>
         <Button variant="outline" fullWidth onClick={() => setSettingsOpen(false)}>Cerrar</Button>

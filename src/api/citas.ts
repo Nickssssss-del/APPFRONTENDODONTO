@@ -21,6 +21,8 @@ export type CitaApi = {
   servicio: { id: string; titulo: string };
   motivoCancelacion?: string | null;
   creadoEn: string;
+  /** Si nació de una reprogramación: la cita original (que quedó REPROGRAMADA). Solo se reprograma una vez. */
+  citaOrigenId?: string | null;
 };
 
 export type PagoApi = {
@@ -52,3 +54,50 @@ export const agendaOdontologo = (desde?: string, hasta?: string) =>
 export const confirmarCita = (id: string) => api<CitaApi>(`/api/odontologos/yo/citas/${id}/confirmar`, { method: 'PATCH' });
 export const completarCita = (id: string) => api<CitaApi>(`/api/odontologos/yo/citas/${id}/completar`, { method: 'PATCH' });
 export const marcarInasistencia = (id: string) => api<CitaApi>(`/api/odontologos/yo/citas/${id}/inasistencia`, { method: 'PATCH' });
+
+/** Mueve la cita a otro turno libre del mismo odontólogo y servicio (una sola vez, hasta 24 h antes). 409 si el turno ya no está libre. */
+export const reprogramarCita = (citaId: string, inicio: string) =>
+  api<CitaApi>(`/api/citas/${citaId}/reprogramar`, { method: 'POST', body: { inicio } });
+
+/* ───────── ¿Te atendieron? (asistencia) ───────── */
+
+export type EstadoReporteAusencia = 'PENDIENTE' | 'CONFIRMADO' | 'RECHAZADO' | 'EN_RECLAMO';
+export type AsistenciaRespuesta = {
+  citaId: string;
+  estadoCita: EstadoCita;
+  reporte?: EstadoReporteAusencia | null;
+  mensaje: string;
+};
+/**
+ * Desde 15 min después del inicio y hasta 72 h después del fin. atendido=false reporta que el odontólogo no llegó;
+ * durante la cita (hasta 2 h después del fin) hay que enviar latitud/longitud (a menos de 200 m del consultorio).
+ */
+export const responderAsistencia = (citaId: string, atendido: boolean, ubicacion?: { latitud: number; longitud: number }) =>
+  api<AsistenciaRespuesta>(`/api/citas/${citaId}/asistencia`, { method: 'POST', body: { atendido, ...ubicacion } });
+
+/* ───────── Reembolsos ───────── */
+
+export type EstadoReembolso = 'SOLICITADO' | 'PROCESANDO' | 'REEMBOLSADO' | 'RECHAZADO' | 'ERROR';
+export type Reembolso = {
+  id: string;
+  estado: EstadoReembolso;
+  monto: number;
+  motivo?: string | null;
+  idExterno?: string | null;
+  solicitadoEn: string;
+  procesadoEn?: string | null;
+  simulado: boolean;
+};
+export const reembolsosDeCita = (citaId: string) => api<Reembolso[]>(`/api/citas/${citaId}/reembolsos`);
+
+/* ───────── Configuración de pagos (pública) ───────── */
+
+export type MetodoDisponible = { metodo: MetodoPago; disponible: boolean; nota?: string | null };
+export type ConfiguracionPagos = {
+  modo: 'simulado' | 'mercadopago';
+  mercadopagoLlavePublica?: string | null;
+  modoPrueba: boolean;
+  moneda: string;
+  metodos: MetodoDisponible[];
+};
+export const configuracionPagos = () => api<ConfiguracionPagos>('/api/public/pagos/config', { auth: false });

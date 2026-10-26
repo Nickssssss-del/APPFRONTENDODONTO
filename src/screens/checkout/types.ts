@@ -1,5 +1,4 @@
 export type PayState = 'idle' | 'processing' | 'verified' | 'rejected';
-export type Provider = 'culqi' | 'niubiz';
 export type PayMethod = 'yape' | 'plin' | 'card';
 
 export interface CardFields {

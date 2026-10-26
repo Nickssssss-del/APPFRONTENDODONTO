@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   CalendarDays, Clock, MapPin, ShieldCheck, ChevronRight, Plus,
-  Stethoscope, CheckCircle2, AlertCircle, RotateCcw, XCircle, Loader2, CreditCard,
+  Stethoscope, CheckCircle2, AlertCircle, RotateCcw, XCircle, Loader2, CreditCard, CalendarClock,
+  UserCheck, Wallet, MessageSquareWarning,
 } from 'lucide-react';
 import { useApp } from '@/storeHooks';
 import { Badge, Button, Modal } from '@/components/ui';
@@ -10,6 +11,18 @@ import { useAsync } from '@/hooks/useAsync';
 import { misCitas, cancelarCita, type CitaApi, type EstadoCita } from '@/api/citas';
 import { ApiError } from '@/api/http';
 import { diaLima, horaLima, soles, segundosHasta, ETIQUETA_ESTADO } from '@/lib/format';
+import { ReprogramarModal, AsistenciaModal, ReembolsosModal } from '@/components/citas/ModalesCita';
+import { puedeReprogramar, puedeResponderAsistencia, puedeVerReembolsos } from '@/components/citas/reglas';
+import { NuevoReclamo } from '@/components/reclamos/MisReclamos';
+
+type Acciones = {
+  onCancel: (a: PatientAppointment) => void;
+  onPay: (a: PatientAppointment) => void;
+  onReschedule: (a: PatientAppointment) => void;
+  onAttendance: (a: PatientAppointment) => void;
+  onRefunds: (a: PatientAppointment) => void;
+  onClaim: (a: PatientAppointment) => void;
+};
 
 type PatientAppointment = {
   id: string;
@@ -35,6 +48,7 @@ const ACTIVAS: EstadoCita[] = ['PENDIENTE_PAGO', 'PENDIENTE_CONFIRMACION', 'CONF
 function aFila(c: CitaApi): PatientAppointment {
   const activa = ACTIVAS.includes(c.estado);
   const futura = new Date(c.fin).getTime() > Date.now();
+  const sinEmpezar = new Date(c.inicio).getTime() > Date.now();
   return {
     id: c.id,
     dentistId: c.odontologo.id,
@@ -47,7 +61,7 @@ function aFila(c: CitaApi): PatientAppointment {
     deposit: c.depositoRequerido,
     depositPaid: c.estado !== 'PENDIENTE_PAGO' && !c.estado.startsWith('CANCELADA'),
     period: activa && futura ? 'upcoming' : 'past',
-    cancelable: activa && futura,
+    cancelable: activa && sinEmpezar,
     payable: c.estado === 'PENDIENTE_PAGO' && segundosHasta(c.pagarAntesDe) > 0,
     raw: c,
   };
@@ -65,7 +79,7 @@ const statusConfig: Record<EstadoCita, { variant: Variante; icon: typeof CheckCi
   REPROGRAMADA: { variant: 'accent', icon: RotateCcw, dot: 'bg-primary-500' },
 };
 
-function AppointmentCard({ appointment, onCancel, onPay }: { appointment: PatientAppointment; onCancel: (a: PatientAppointment) => void; onPay: (a: PatientAppointment) => void }) {
+function AppointmentCard({ appointment, onCancel, onPay, onReschedule, onAttendance, onRefunds, onClaim }: { appointment: PatientAppointment } & Acciones) {
   const { setSelectedDentistId, setSelectedDentistName, setScreen } = useApp();
   const status = statusConfig[appointment.status];
   const StatusIcon = status.icon;
@@ -111,7 +125,7 @@ function AppointmentCard({ appointment, onCancel, onPay }: { appointment: Patien
       </div>
       <div className="border-t border-slatey-100 px-4 pb-4 pt-3">
         <div className="flex items-center gap-1.5 text-xs text-slatey-500">
-          <MapPin className="h-3.5 w-3.5 text-slatey-400" />
+          <MapPin className="h-3.5 w-3.5 text-slatey-500" aria-hidden="true" />
           <span className="truncate">{appointment.address}</span>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
@@ -141,9 +155,29 @@ function AppointmentCard({ appointment, onCancel, onPay }: { appointment: Patien
               <CreditCard className="h-3.5 w-3.5" /> Pagar depósito
             </Button>
           )}
+          {puedeResponderAsistencia(appointment.raw) && (
+            <Button variant="success" size="sm" className="col-span-2 w-full text-xs font-semibold px-2 py-2.5 rounded-xl" onClick={() => onAttendance(appointment)}>
+              <UserCheck className="h-3.5 w-3.5" aria-hidden="true" /> ¿Te atendieron?
+            </Button>
+          )}
+          {puedeReprogramar(appointment.raw) && (
+            <Button variant="outline" size="sm" className="w-full text-xs font-semibold px-2 py-2.5 rounded-xl" onClick={() => onReschedule(appointment)}>
+              <CalendarClock className="h-3.5 w-3.5" aria-hidden="true" /> Reprogramar
+            </Button>
+          )}
           {appointment.cancelable && (
-            <Button variant="outline" size="sm" className="col-span-2 w-full text-xs font-semibold px-2 py-2.5 rounded-xl" onClick={() => onCancel(appointment)}>
+            <Button variant="outline" size="sm" className={`${puedeReprogramar(appointment.raw) ? '' : 'col-span-2 '}w-full text-xs font-semibold px-2 py-2.5 rounded-xl`} onClick={() => onCancel(appointment)}>
               Cancelar cita
+            </Button>
+          )}
+          {puedeVerReembolsos(appointment.raw) && (
+            <Button variant="ghost" size="sm" className="w-full text-xs font-semibold px-2 py-2.5 rounded-xl" onClick={() => onRefunds(appointment)}>
+              <Wallet className="h-3.5 w-3.5" aria-hidden="true" /> Reembolsos
+            </Button>
+          )}
+          {appointment.period === 'past' && (
+            <Button variant="ghost" size="sm" className={`${puedeVerReembolsos(appointment.raw) ? '' : 'col-span-2 '}w-full text-xs font-semibold px-2 py-2.5 rounded-xl`} onClick={() => onClaim(appointment)}>
+              <MessageSquareWarning className="h-3.5 w-3.5" aria-hidden="true" /> Reclamar
             </Button>
           )}
         </div>
@@ -186,6 +220,13 @@ export default function PatientAppointments() {
     }
   };
 
+  // Reprogramar, ¿te atendieron?, reembolsos y reclamo sobre una cita
+  const [aReprogramar, setAReprogramar] = useState<CitaApi | null>(null);
+  const [aAsistencia, setAAsistencia] = useState<CitaApi | null>(null);
+  const [aReembolsos, setAReembolsos] = useState<CitaApi | null>(null);
+  const [aReclamar, setAReclamar] = useState<CitaApi | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+
   // Retoma el pago de una cita PENDIENTE_PAGO que aún está dentro de los 15 minutos
   const irAPagar = (a: PatientAppointment) => {
     const c = a.raw;
@@ -217,7 +258,8 @@ export default function PatientAppointments() {
               setSelectedDentistId(null);
               setScreen('marketplace');
             }}
-            className="flex items-center gap-1.5 rounded-xl bg-primary-500 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-primary-500/30 hover:bg-primary-600"
+            aria-label="Nueva cita"
+            className="min-h-[44px] flex items-center gap-1.5 rounded-xl bg-primary-500 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-primary-500/30 hover:bg-primary-600"
           >
             <Plus className="h-4 w-4" /> Nueva
           </button>
@@ -249,14 +291,19 @@ export default function PatientAppointments() {
             <button
               key={tab}
               onClick={() => setPeriod(tab)}
+              aria-pressed={period === tab}
               className={`flex-1 rounded-xl py-2.5 text-sm font-bold transition-all ${
-                period === tab ? 'bg-white text-primary-600 shadow-sm' : 'text-slatey-500 hover:text-slatey-700'
+                period === tab ? 'bg-white text-primary-600 shadow-sm' : 'text-slatey-600 hover:text-slatey-800'
               }`}
             >
               {tab === 'upcoming' ? 'Próximas' : 'Pasadas'}
             </button>
           ))}
         </div>
+
+        {aviso && (
+          <p role="status" className="rounded-2xl border border-success-100 bg-success-50 px-4 py-3 text-xs font-semibold text-success-700">{aviso}</p>
+        )}
 
         {citas.loading ? (
           <div className="flex justify-center py-12" aria-busy="true">
@@ -286,7 +333,16 @@ export default function PatientAppointments() {
         ) : (
           <div className="space-y-3">
             {visibleAppointments.map((appointment) => (
-              <AppointmentCard key={appointment.id} appointment={appointment} onCancel={setACancelar} onPay={irAPagar} />
+              <AppointmentCard
+                key={appointment.id}
+                appointment={appointment}
+                onCancel={setACancelar}
+                onPay={irAPagar}
+                onReschedule={(a) => setAReprogramar(a.raw)}
+                onAttendance={(a) => setAAsistencia(a.raw)}
+                onRefunds={(a) => setAReembolsos(a.raw)}
+                onClaim={(a) => setAReclamar(a.raw)}
+              />
             ))}
           </div>
         )}
@@ -302,7 +358,8 @@ export default function PatientAppointments() {
             onChange={(e) => setMotivo(e.target.value.slice(0, 500))}
             rows={3}
             placeholder="Motivo (opcional)"
-            className="w-full rounded-2xl border border-slatey-200 bg-slatey-50 px-3 py-2.5 text-sm text-slatey-900 placeholder:text-slatey-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
+            aria-label="Motivo de la cancelación (opcional)"
+            className="w-full rounded-2xl border border-slatey-200 bg-slatey-50 px-3 py-2.5 text-sm text-slatey-900 placeholder:text-slatey-500 focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
           {errorCancelar && <p role="alert" className="text-xs font-semibold text-error-600">{errorCancelar}</p>}
           <div className="grid grid-cols-2 gap-2">
@@ -311,6 +368,24 @@ export default function PatientAppointments() {
           </div>
         </div>
       </Modal>
+
+      <ReprogramarModal
+        cita={aReprogramar}
+        onClose={() => setAReprogramar(null)}
+        onHecho={() => { setAReprogramar(null); setAviso('Cita reprogramada. Te enviamos la nueva fecha por correo.'); citas.reload(); }}
+      />
+      <AsistenciaModal cita={aAsistencia} onClose={() => setAAsistencia(null)} onHecho={citas.reload} />
+      <ReembolsosModal cita={aReembolsos} onClose={() => setAReembolsos(null)} />
+      {aReclamar && (
+        <NuevoReclamo
+          key={aReclamar.id}
+          abierto
+          citas={citas.data ?? []}
+          citaInicial={aReclamar.id}
+          onCerrar={() => setAReclamar(null)}
+          onCreado={() => { setAReclamar(null); setAviso('Reclamo registrado. Puedes seguirlo en Mi perfil > Reclamos.'); }}
+        />
+      )}
     </div>
   );
 }

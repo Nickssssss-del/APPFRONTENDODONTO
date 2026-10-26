@@ -10,7 +10,8 @@ export default {
           200: '#99F6E4',
           300: '#5EEAD4',
           400: '#2DD4BF',
-          500: '#0E9488',
+          // 500 oscurecido de #0E9488 → #0F766E: texto blanco encima pasa de 3.74:1 a 5.47:1 (WCAG AA)
+          500: '#0F766E',
           600: '#0D5C52',
           700: '#0A4A43',
           800: '#083F3A',
@@ -53,6 +54,7 @@ export default {
           100: '#FFEDD5',
           500: '#F97316',
           600: '#EA580C',
+          700: '#C2410C',
         },
         error: {
           50: '#FEF2F2',

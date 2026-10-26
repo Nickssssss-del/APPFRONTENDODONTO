@@ -25,7 +25,7 @@ export function ComprobantesTab({ citas, onReserve }: Props) {
     setBajando(c.id);
     setError(null);
     try {
-      guardarArchivo(await descargarConstancia(c.id), `constancia-${c.id.slice(0, 8)}.pdf`);
+      await guardarArchivo(await descargarConstancia(c.id), `constancia-${c.id.slice(0, 8)}.pdf`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'No se pudo descargar la constancia.');
     } finally {
@@ -43,7 +43,7 @@ export function ComprobantesTab({ citas, onReserve }: Props) {
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slatey-900 leading-tight">{c.servicio.titulo}</p>
                 <p className="text-xs text-slatey-500 mt-0.5">{c.odontologo.nombre}</p>
-                <p className="text-xs text-slatey-400">{diaLima(c.inicio)} · {ETIQUETA_ESTADO[c.estado]}</p>
+                <p className="text-xs text-slatey-500">{diaLima(c.inicio)} · {ETIQUETA_ESTADO[c.estado]}</p>
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-sm font-extrabold text-slatey-900">{soles(c.precio)}</p>
@@ -62,7 +62,7 @@ export function ComprobantesTab({ citas, onReserve }: Props) {
           </motion.div>
         ))}
       </div>
-      <p className="text-[11px] text-slatey-400 text-center pb-2">La constancia acredita el pago del depósito. La boleta o factura del servicio la emite el odontólogo.</p>
+      <p className="text-[11px] text-slatey-500 text-center pb-2">La constancia acredita el pago del depósito. La boleta o factura del servicio la emite el odontólogo.</p>
     </div>
   );
 }

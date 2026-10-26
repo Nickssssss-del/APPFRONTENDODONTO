@@ -29,7 +29,7 @@ export function HistorialTab({ entries, loading, error, onRetry, onReserve }: Pr
               <div className="rounded-2xl border border-primary-100 bg-primary-50 p-3.5 space-y-2.5">
                 <div>
                   <p className="text-xs font-bold text-slatey-800 leading-tight">{h.servicio}</p>
-                  <p className="text-[11px] text-slatey-400 mt-0.5">{h.odontologo} · {diaLima(h.fechaCita)} · {horaLima(h.fechaCita)}</p>
+                  <p className="text-[11px] text-slatey-500 mt-0.5">{h.odontologo} · {diaLima(h.fechaCita)} · {horaLima(h.fechaCita)}</p>
                 </div>
                 <Bloque icon={<Stethoscope className="w-3 h-3" />} titulo="Diagnóstico" texto={h.diagnostico} />
                 <Bloque icon={<Pill className="w-3 h-3" />} titulo="Tratamiento" texto={h.tratamiento} />

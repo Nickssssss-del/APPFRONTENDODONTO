@@ -42,7 +42,7 @@ function Avatar({ nombre, url, className }: { nombre: string; url?: string | nul
   }
   const iniciales = nombre.replace(/^(Dr\.|Dra\.)\s*/i, '').split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase();
   return (
-    <div className={`${className} bg-primary-100 text-primary-700 font-bold flex items-center justify-center`}>{iniciales || '🦷'}</div>
+    <div className={`${className} bg-primary-100 text-primary-700 font-bold flex items-center justify-center`}>{iniciales || 'OD'}</div>
   );
 }
 
@@ -142,7 +142,8 @@ export default function Marketplace() {
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setScreen(role === 'patient' ? 'patientDashboard' : 'dentistPanel')}
-                className="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors"
+                aria-label="Volver al inicio"
+                className="w-11 h-11 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors"
               >
                 <BackIcon />
               </button>
@@ -159,10 +160,12 @@ export default function Marketplace() {
           <div className="relative">
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slatey-400" />
             <input
+              type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
+              aria-label="Buscar odontólogo"
               placeholder="Buscar por nombre, consultorio o especialidad"
-              className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slatey-200 bg-white text-sm text-slatey-900 placeholder:text-slatey-400 focus:outline-none focus:border-primary-400"
+              className="w-full pl-10 pr-4 py-3 rounded-2xl border-2 border-slatey-200 bg-white text-sm text-slatey-900 placeholder:text-slatey-500 focus:outline-none focus:border-primary-400"
             />
           </div>
         </div>
@@ -203,7 +206,7 @@ export default function Marketplace() {
                     <div className="flex items-center gap-1">
                       <Star className="w-3.5 h-3.5 fill-accent-400 text-accent-400" />
                       <span className="text-xs font-bold text-slatey-900">{Number(d.calificacion).toFixed(1)}</span>
-                      <span className="text-xs text-slatey-400">({d.totalResenas ?? 0})</span>
+                      <span className="text-xs text-slatey-500">({d.totalResenas ?? 0})</span>
                     </div>
                   )}
                   {(d.distrito || d.consultorio) && (
@@ -273,7 +276,7 @@ export default function Marketplace() {
         <div className="relative h-44 overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700">
           {fotos[0] && <img src={fotos[0].url} alt="Consultorio" className="w-full h-full object-cover" />}
           <div className="absolute inset-0 bg-gradient-to-t from-slatey-900/70 via-slatey-900/20 to-transparent" />
-          <button onClick={volverALista} className="absolute top-4 left-4 p-2.5 rounded-xl glass text-white hover:bg-white/20 transition-colors">
+          <button onClick={volverALista} aria-label="Volver a la lista de odontólogos" className="absolute top-4 left-4 p-2.5 rounded-xl glass text-white hover:bg-white/20 transition-colors">
             <BackIcon />
           </button>
         </div>
@@ -301,7 +304,7 @@ export default function Marketplace() {
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 fill-accent-400 text-accent-400" />
                       <span className="text-sm font-bold text-slatey-900">{Number(p.calificacion).toFixed(1)}</span>
-                      <span className="text-xs text-slatey-400">({p.totalResenas ?? 0} reseñas)</span>
+                      <span className="text-xs text-slatey-500">({p.totalResenas ?? 0} reseñas)</span>
                     </div>
                   )}
                 </div>
@@ -453,7 +456,7 @@ export default function Marketplace() {
               {!esDentista && <ArrowRight className="w-5 h-5" />}
             </Button>
           </div>
-          <p className="text-xs text-slatey-400 text-center mt-2">
+          <p className="text-xs text-slatey-500 text-center mt-2">
             {selectedTime ? `${selectedDay} · ${selectedTime} · ${selectedTreatment.name}` : 'Reservas con el depósito indicado.'}
           </p>
         </div>

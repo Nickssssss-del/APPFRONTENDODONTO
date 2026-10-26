@@ -3,19 +3,21 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import { useApp } from '../../storeHooks';
 import { Button, Modal } from '../../components/ui';
-import { pagarDeposito, reservarCita, type MetodoPago } from '@/api/citas';
+import { configuracionPagos, pagarDeposito, reservarCita, type MetodoPago } from '@/api/citas';
+import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';
 import { segundosHasta } from '@/lib/format';
 
 import { AppointmentSummary } from './AppointmentSummary';
 import { MethodSelector } from './MethodSelector';
+import { estadoMetodo } from './metodos';
 import { QrPanel } from './QrPanel';
 import { CardPanel } from './CardPanel';
 import { TrustBadges } from './TrustBadges';
 import { SuccessModal } from './SuccessModal';
 import { RejectedModal } from './RejectedModal';
 
-import type { PayState, PayMethod, Provider, CardFields } from './types';
+import type { PayState, PayMethod, CardFields } from './types';
 
 const METODO_API: Record<PayMethod, MetodoPago> = { yape: 'YAPE', plin: 'PLIN', card: 'TARJETA' };
 
@@ -53,7 +55,9 @@ export default function CheckoutScreen() {
     : 900;
 
   // ── Local state ──────────────────────────────────────────────────────────────
-  const [provider] = useState<Provider>('culqi'); // Switch UI removed; set via env/config
+  // Modo de pagos y métodos disponibles (PLIN sale deshabilitado: "Próximamente")
+  const config = useAsync(() => configuracionPagos(), []);
+  const modoPagos = config.data?.modo ?? 'simulado';
   const [payMethod, setPayMethod] = useState<PayMethod>('yape');
   const [operationNumber, setOperationNumber] = useState('');
   const [payState, setPayState] = useState<PayState>('idle');
@@ -140,11 +144,14 @@ export default function CheckoutScreen() {
   };
 
   const handleCardTokenReady = (_fields: CardFields) => {
-    // INTEGRATION POINT: pass fields to Culqi / Niubiz SDK for tokenization.
-    // The raw number and CVV must NEVER be sent to your own backend directly.
-    // Example (Culqi):
-    //   Culqi.createToken(fields, (token) => setCardToken(token.id));
+    // Con PAGOS_MODO=mercadopago la tarjeta se tokeniza en el SDK de Mercado Pago (Bricks) con
+    // config.data.mercadopagoLlavePublica. El número y el CVV NUNCA se envían a nuestro backend.
   };
+
+  // Si el método elegido no está habilitado en el backend (p. ej. PLIN), vuelve a Yape
+  useEffect(() => {
+    if (!estadoMetodo(config.data?.metodos, payMethod).disponible) setPayMethod('yape');
+  }, [config.data, payMethod]);
 
   // ── CTA guard ────────────────────────────────────────────────────────────────
   const qrReady = payMethod !== 'card' && operationNumber.length === 6;
@@ -200,7 +207,13 @@ export default function CheckoutScreen() {
                 setPayState('idle');
               }}
               disabled={payState === 'processing' || payState === 'verified'}
+              metodos={config.data?.metodos}
             />
+            {config.data?.modoPrueba && (
+              <p className="-mt-2 rounded-xl bg-accent-50 px-3 py-2 text-[11px] font-medium text-accent-700">
+                Modo de prueba: ningún cobro es real.
+              </p>
+            )}
 
             {/* Payment panel — animated transition */}
             <AnimatePresence mode="wait">
@@ -231,7 +244,7 @@ export default function CheckoutScreen() {
                   transition={{ duration: 0.2 }}
                 >
                   <CardPanel
-                    provider={provider}
+                    modo={modoPagos}
                     onReadyToTokenize={handleCardTokenReady}
                     disabled={payState === 'processing' || payState === 'verified'}
                   />
@@ -276,7 +289,7 @@ export default function CheckoutScreen() {
               )}
             </Button>
             {payMethod !== 'card' && operationNumber.length < 6 && payState === 'idle' && (
-              <p className="text-center text-[11px] text-slatey-400 mt-2">
+              <p className="text-center text-[11px] text-slatey-500 mt-2">
                 Ingresa el N° de operación de 6 dígitos para habilitar el pago
               </p>
             )}

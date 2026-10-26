@@ -115,8 +115,8 @@ export function SuccessModal({
 
   const handleWhatsApp = () => {
     const text = encodeURIComponent(
-      `¡Reservé mi cita con ${dentistName}! 🦷\n` +
-        `📅 ${selectedDay} a las ${selectedTime}\n` +
+      `¡Reservé mi cita con ${dentistName}!\n` +
+        `Fecha: ${selectedDay} a las ${selectedTime}\n` +
         `Servicio: ${treatment.name}\n` +
         `Descarga OdontoSystem y reserva la tuya.`
     );
@@ -170,7 +170,7 @@ export function SuccessModal({
                       Tu cita con <strong>{dentistName}</strong> está confirmada.
                     </>
                   )}
-                  {simulated && <span className="block text-xs text-slatey-400 mt-1">Pago simulado (modo de pruebas).</span>}
+                  {simulated && <span className="block text-xs text-slatey-500 mt-1">Pago simulado (modo de pruebas).</span>}
                 </p>
               </div>
 
@@ -202,7 +202,7 @@ export function SuccessModal({
                 <ActionBtn icon={<Share2 className="w-4 h-4" />} label="WhatsApp" onClick={handleWhatsApp} />
               </div>
 
-              <p className="text-[11px] text-slatey-400 leading-snug">
+              <p className="text-[11px] text-slatey-500 leading-snug">
                 <CheckCircle2 className="w-3 h-3 inline mr-1 text-success-400" />
                 Tus datos están protegidos conforme a la{' '}
                 <strong>Ley N.° 29733</strong> de protección de datos personales.

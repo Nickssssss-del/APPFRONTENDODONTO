@@ -19,7 +19,7 @@ const QUICK_REPLIES = [
 ];
 
 export default function Chatbot() {
-  const { setScreen, setActiveCita, setSelectedTreatment, setSelectedDay, setSelectedTime, setSelectedDentistName } = useApp();
+  const { role, setScreen, setActiveCita, setSelectedTreatment, setSelectedDay, setSelectedTime, setSelectedDentistName } = useApp();
   const [sesionId, setSesionId] = useState<string | undefined>(undefined);
   const [messages, setMessages] = useState<ChatItem[]>([
     {
@@ -99,8 +99,9 @@ export default function Chatbot() {
       <div className="sticky top-0 z-30 glass border-b border-slatey-100 bg-white/80 backdrop-blur-md">
         <div className="flex items-center gap-3 px-4 py-3">
           <button
-            onClick={() => setScreen('patientDashboard')}
-            className="p-2 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors"
+            onClick={() => setScreen(role === 'dentist' ? 'dentistPanel' : 'patientDashboard')}
+            aria-label="Volver al inicio"
+            className="p-2.5 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-slatey-700" />
           </button>
@@ -217,15 +218,17 @@ export default function Chatbot() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && sendMessage(input)}
+            aria-label="Mensaje para OdontoBot"
             placeholder="Escribe tu mensaje..."
-            className="flex-1 px-4 py-3 rounded-2xl bg-slatey-100 text-slatey-900 placeholder:text-slatey-400 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-400 transition-all text-sm"
+            className="flex-1 px-4 py-3 rounded-2xl bg-slatey-100 text-slatey-900 placeholder:text-slatey-500 focus:outline-none focus:bg-white focus:ring-2 focus:ring-primary-400 transition-all text-sm"
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim()}
+            aria-label="Enviar mensaje"
             className="w-11 h-11 rounded-2xl bg-primary-500 text-white flex items-center justify-center hover:bg-primary-600 disabled:opacity-40 active:scale-95 transition-all shrink-0 shadow-sm"
           >
-            <Send className="w-5 h-5" />
+            <Send className="w-5 h-5" aria-hidden="true" />
           </button>
         </div>
       </div>

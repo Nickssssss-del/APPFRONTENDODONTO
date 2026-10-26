@@ -1,20 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-const useBottomSheet = () => {
+/** Estado simple de una hoja inferior: abierta/cerrada y el elemento que muestra. */
+const useBottomSheet = <T,>() => {
   const [open, setOpen] = useState(false);
-  const [service, setService] = useState(null);
+  const [item, setItem] = useState<T | null>(null);
 
-  const openBottomSheet = (service: any) => {
-    setService(service);
+  const openBottomSheet = (value: T) => {
+    setItem(value);
     setOpen(true);
   };
 
   const closeBottomSheet = () => {
     setOpen(false);
-    setService(null);
+    setItem(null);
   };
 
-  return [open, setOpen, service, closeBottomSheet];
+  return { open, item, openBottomSheet, closeBottomSheet };
 };
 
 export default useBottomSheet;

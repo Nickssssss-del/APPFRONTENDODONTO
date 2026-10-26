@@ -31,6 +31,7 @@ export default function PatientBottomNav() {
                   onClick={() => setScreen(item.key)}
                   data-testid={item.key}
                   id={`nav-${item.key}`}
+                  aria-current={active ? 'page' : undefined}
                   className={`relative flex flex-col items-center justify-center gap-0.5 transition-all duration-200 ${
                     isCenter ? 'flex-1' : 'flex-1'
                   }`}
@@ -57,14 +58,14 @@ export default function PatientBottomNav() {
                       animate={{ scale: active ? 1.15 : 1 }}
                       transition={{ type: 'spring', stiffness: 400, damping: 20 }}
                       className={`flex items-center justify-center transition-colors duration-200 ${
-                        active ? 'text-primary-600' : 'text-slatey-400'
+                        active ? 'text-primary-600' : 'text-slatey-500'
                       }`}
                     >
                       {item.icon}
                     </motion.div>
                     <span
                       className={`text-[10px] font-semibold transition-all duration-200 overflow-hidden ${
-                        active ? 'text-primary-600 max-h-4 opacity-100' : 'text-slatey-400 max-h-0 opacity-0'
+                        active ? 'text-primary-600 max-h-4 opacity-100' : 'text-slatey-500 max-h-0 opacity-0'
                       }`}
                     >
                       {item.label}
