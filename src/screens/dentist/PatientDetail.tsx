@@ -115,6 +115,19 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
               <Mail className="w-4 h-4 text-slatey-400 flex-shrink-0" /> <span className="truncate">{paciente.correo}</span>
             </div>
           )}
+          {/* Alergias y Antecedentes (datos no disponibles en agenda, se muestran placeholders) */}
+          <div className="space-y-2 pt-2 border-t border-slatey-100">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-900">
+              <AlertCircle className="w-4 h-4 text-slatey-400 flex-shrink-0" />
+              <span className="font-semibold">Alergias:</span>
+              <span className="text-slatey-500 ml-2">Ninguna registrada</span>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-900">
+              <FileText className="w-4 h-4 text-slatey-400 flex-shrink-0" />
+              <span className="font-semibold">Antecedentes:</span>
+              <span className="text-slatey-500 ml-2">Sin antecedentes registrados</span>
+            </div>
+          </div>
         </div>
       </motion.div>
 
