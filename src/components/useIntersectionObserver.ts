@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 
 const useIntersectionObserver = (options: IntersectionObserverInit) => {
-  const ref = useRef(null);
+  const ref = useRef<HTMLElement | null>(null);
   const [inView, setInView] = useState(false);
 
   useEffect(() => {
@@ -9,17 +9,18 @@ const useIntersectionObserver = (options: IntersectionObserverInit) => {
       const entry = entries[0];
       setInView(entry.isIntersecting);
     }, options);
-    if (ref.current) {
-      observer.observe(ref.current);
+    const element = ref.current;
+    if (element) {
+      observer.observe(element);
     }
     return () => {
-      if (ref.current) {
-        observer.unobserve(ref.current);
+      if (element) {
+        observer.unobserve(element);
       }
     };
   }, [options]);
 
-  return [ref, inView];
+  return [ref, inView] as const;
 };
 
 export default useIntersectionObserver;

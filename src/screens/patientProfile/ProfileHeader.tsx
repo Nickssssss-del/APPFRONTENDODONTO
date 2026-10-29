@@ -1,6 +1,7 @@
 import { useRef } from 'react';
-import { Camera, CheckCircle2, Mail, Shield } from 'lucide-react';
+import { Camera, Mail, Shield } from 'lucide-react';
 import SmartImage from '@/components/SmartImage';
+import { Badge } from '@/components/ui';
 import type { UserProfile } from '@/types';
 
 interface Props {
@@ -93,7 +94,9 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
             {/* Verified badges */}
             <div className="flex flex-wrap gap-1.5 mt-2">
               {user.email && user.emailVerified && (
-                <VerifiedBadge icon={<Mail className="w-3 h-3" />} label="Correo verificado" />
+                <Badge variant="success" size="sm">
+                  <Mail className="w-3 h-3" /> Correo verificado
+                </Badge>
               )}
             </div>
           </div>

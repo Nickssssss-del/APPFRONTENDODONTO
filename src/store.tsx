@@ -195,6 +195,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const cita = await reservarCita(odontologoId, servicioId, inicio);
     const pago = await pagarDeposito(cita.id, metodo);
     await refreshAppointments();
+    if (pago.estado === 'RECHAZADO') {
+      // Propagar el error para que el llamante maneje el rechazado
+      throw new Error(pago.mensaje ?? 'El pago fue rechazado. Prueba con otro medio de pago.');
+    }
     return pago.cita;
   }, [refreshAppointments]);
 

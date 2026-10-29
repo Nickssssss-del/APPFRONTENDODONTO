@@ -7,6 +7,7 @@ import { useApp } from '@/storeHooks';
 
 export const TUTORIAL_KEY = 'tutorial_bienvenida_visto';
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function hasSeenTutorial(): boolean {
   try {
     return localStorage.getItem(TUTORIAL_KEY) === '1';
