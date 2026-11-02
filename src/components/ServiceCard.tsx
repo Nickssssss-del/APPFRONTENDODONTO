@@ -4,6 +4,7 @@ import SmartImage from '@/components/SmartImage';
 import type { ServiceItem } from '@/types';
 
 /** 2160 → "S/ 2,160" · 49.5 → "S/ 49.50" (sin decimales si el monto es entero). */
+// eslint-disable-next-line react-refresh/only-export-components
 export function formatPEN(amount: number) {
   const hasCents = Math.round(amount * 100) % 100 !== 0;
   return new Intl.NumberFormat('es-PE', {
@@ -14,6 +15,7 @@ export function formatPEN(amount: number) {
   }).format(amount);
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function formatDuration(min: number) {
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);

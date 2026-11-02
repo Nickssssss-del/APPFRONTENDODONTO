@@ -5,7 +5,7 @@ import { Badge, Button } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';
 import { agendaOdontologo, type CitaApi } from '@/api/citas';
-import { historiasEscritasPara, registrarHistoria, type Historia } from '@/api/panel';
+import { historiasEscritasPara, registrarHistoria } from '@/api/panel';
 import { agruparPacientes, iniciales } from '@/lib/pacientes';
 import { diaLima, fechaIsoLima, horaLima, sumarDias } from '@/lib/format';
 
@@ -25,7 +25,7 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
 
   const paciente = useMemo(() => agruparPacientes(agenda.data ?? []).find((p) => p.id === patientId), [agenda.data, patientId]);
   const citasPaciente = paciente?.citas ?? [];
-  const listaHistorias: Historia[] = historias.data ?? [];
+  const listaHistorias = useMemo(() => historias.data ?? [], [historias.data]);
   const conHistoria = useMemo(() => new Set(listaHistorias.map((h) => h.citaId)), [listaHistorias]);
   // Una historia solo se escribe una vez por cita y solo cuando la cita ya fue atendida.
   const pendientesDeHistoria = citasPaciente.filter((c) => c.estado === 'COMPLETADA' && !conHistoria.has(c.id));

@@ -72,7 +72,7 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   const [cambiandoAgenda, setCambiandoAgenda] = useState(false);
 
-  const citas = agenda.data ?? [];
+  const citas = useMemo(() => agenda.data ?? [], [agenda.data]);
   const citasHoy = useMemo(
     () => citas.filter((c) => fechaIsoLima(c.inicio) === hoy && ESTADOS_ACTIVOS.has(c.estado)).sort((a, b) => a.inicio.localeCompare(b.inicio)),
     [citas, hoy],

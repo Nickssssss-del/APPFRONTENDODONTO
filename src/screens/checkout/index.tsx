@@ -16,8 +16,9 @@ import { CardPanel } from './CardPanel';
 import { TrustBadges } from './TrustBadges';
 import { SuccessModal } from './SuccessModal';
 import { RejectedModal } from './RejectedModal';
+import { MercadoPagoBrick } from './MercadoPagoBrick';
 
-import type { PayState, PayMethod, CardFields } from './types';
+import type { PayState, PayMethod } from './types';
 
 const METODO_API: Record<PayMethod, MetodoPago> = { yape: 'YAPE', plin: 'PLIN', card: 'TARJETA' };
 
@@ -108,16 +109,103 @@ export default function CheckoutScreen() {
       // 2) Se paga el depósito. El backend solo recibe el método: los datos de tarjeta NUNCA salen del navegador.
       paso = 'pagar';
       const pago = await pagarDeposito(cita.id, METODO_API[payMethod]);
+
+      // Manejo según el estado devuelto por el backend
+      if (pago.estado === 'RECHAZADO') {
+        setErrorMsg(pago.mensaje ?? 'El pago fue rechazado. Prueba con otro medio de pago.');
+        setPayState('rejected');
+        setShowRejected(true);
+        // No tocar activeCita: la cita sigue PENDIENTE_PAGO y se reutiliza
+        return;
+      }
+
+      if (pago.estado === 'PENDIENTE') {
+        // Pago en confirmación: mostramos modal de éxito con texto de confirmación pendiente
+        setActiveCita(pago.cita);
+        setSimulado(pago.simulado);
+        setPayState('verified');
+        void refreshAppointments();
+        setTimeout(() => setShowSuccess(true), 600);
+        return;
+      }
+
+      // VERIFICADO (o cualquier otro estado considerado éxito)
       setActiveCita(pago.cita);
       setSimulado(pago.simulado);
       setPayState('verified');
-      void refreshAppointments(); // trae al store la cita ya confirmada
+      void refreshAppointments();
       setTimeout(() => setShowSuccess(true), 600);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : 'No se pudo procesar el pago.';
       setErrorMsg(msg);
       if (e instanceof ApiError && e.status === 409) {
-        // Reservar: el turno se ocupó. Pagar: pasaron los 15 minutos y el turno se liberó.
+        // Si el mensaje indica "en confirmación", no marcamos el turno como expirado
+        if (/en confirmaci[oó]n/i.test(msg)) {
+          // Mostramos el mensaje pero dejamos la cita como está
+          setPayState('idle');
+          return;
+        }
+        // Caso normal de 409: turno ocupado o tiempo agotado
+        if (paso === 'reservar') setSelectedSlotStart(null);
+        setActiveCita(null);
+        setPayState('idle');
+        setExpirado(true);
+      } else {
+        setPayState('rejected');
+        setShowRejected(true);
+      }
+    }
+  };
+
+  /** Procesa el token devuelto por el Brick de Mercado Pago */
+  const processMercadoPagoPayment = async (_metodo: 'TARJETA', tokenData: { token: string; medioPagoId?: string }) => {
+    if (payState === 'processing') return;
+    setPayState('processing');
+    setErrorMsg(null);
+    let paso: 'reservar' | 'pagar' = 'reservar';
+    try {
+      // 1) Reservar turno si no existe (igual que handlePay)
+      let cita = activeCita;
+      if (!cita) {
+        if (!selectedDentistId || !selectedSlotStart) throw new ApiError(400, 'Falta elegir odontólogo y horario.');
+        cita = await reservarCita(selectedDentistId, selectedTreatment.id, selectedSlotStart);
+        setActiveCita(cita);
+      }
+      // 2) Pagar con token
+      paso = 'pagar';
+      const pago = await pagarDeposito(cita.id, METODO_API[payMethod], tokenData);
+
+      // Manejo según el estado devuelto por el backend (reutiliza lógica de handlePay)
+      if (pago.estado === 'RECHAZADO') {
+        setErrorMsg(pago.mensaje ?? 'El pago fue rechazado. Prueba con otro medio de pago.');
+        setPayState('rejected');
+        setShowRejected(true);
+        return;
+      }
+
+      if (pago.estado === 'PENDIENTE') {
+        setActiveCita(pago.cita);
+        setSimulado(pago.simulado);
+        setPayState('verified');
+        void refreshAppointments();
+        setTimeout(() => setShowSuccess(true), 600);
+        return;
+      }
+
+      // VERIFICADO u otro éxito
+      setActiveCita(pago.cita);
+      setSimulado(pago.simulado);
+      setPayState('verified');
+      void refreshAppointments();
+      setTimeout(() => setShowSuccess(true), 600);
+    } catch (e) {
+      const msg = e instanceof ApiError ? e.message : 'No se pudo procesar el pago.';
+      setErrorMsg(msg);
+      if (e instanceof ApiError && e.status === 409) {
+        if (/en confirmaci[oó]n/i.test(msg)) {
+          setPayState('idle');
+          return;
+        }
         if (paso === 'reservar') setSelectedSlotStart(null);
         setActiveCita(null);
         setPayState('idle');
@@ -143,10 +231,7 @@ export default function CheckoutScreen() {
     setPayMethod(m);
   };
 
-  const handleCardTokenReady = (_fields: CardFields) => {
-    // Con PAGOS_MODO=mercadopago la tarjeta se tokeniza en el SDK de Mercado Pago (Bricks) con
-    // config.data.mercadopagoLlavePublica. El número y el CVV NUNCA se envían a nuestro backend.
-  };
+  
 
   // Si el método elegido no está habilitado en el backend (p. ej. PLIN), vuelve a Yape
   useEffect(() => {
@@ -154,8 +239,9 @@ export default function CheckoutScreen() {
   }, [config.data, payMethod]);
 
   // ── CTA guard ────────────────────────────────────────────────────────────────
+  const isMercadoPagoCard = modoPagos === 'mercadopago' && payMethod === 'card';
   const qrReady = payMethod !== 'card' && operationNumber.length === 6;
-  const cardReady = payMethod === 'card'; // card readiness is validated inside CardPanel
+  const cardReady = payMethod === 'card' && !isMercadoPagoCard; // CardPanel only
   const canPay = payState === 'idle' && (qrReady || cardReady);
 
   const time = selectedTime ?? '';
@@ -243,11 +329,18 @@ export default function CheckoutScreen() {
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <CardPanel
-                    modo={modoPagos}
-                    onReadyToTokenize={handleCardTokenReady}
-                    disabled={payState === 'processing' || payState === 'verified'}
-                  />
+                  {modoPagos === 'mercadopago' ? (
+                    <MercadoPagoBrick
+                      publicKey={config.data?.mercadopagoLlavePublica ?? ''}
+                      amount={guarantee}
+                      onToken={processMercadoPagoPayment}
+                    />
+                  ) : (
+                    <CardPanel
+                      modo={modoPagos}
+                      disabled={payState === 'processing' || payState === 'verified'}
+                    />
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -265,33 +358,37 @@ export default function CheckoutScreen() {
                 {errorMsg ?? 'El pago fue rechazado. Reintenta o elige otro método.'}
               </p>
             )}
-            <Button
-              fullWidth
-              size="lg"
-              loading={payState === 'processing'}
-              disabled={!canPay}
-              onClick={handlePay}
-            >
-              {payState === 'processing' && (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Procesando…
-                </>
-              )}
-              {payState === 'verified' && (
-                <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  Depósito confirmado
-                </>
-              )}
-              {(payState === 'idle' || payState === 'rejected') && (
-                <>Pagar S/ {guarantee.toFixed(2)}</>
-              )}
-            </Button>
-            {payMethod !== 'card' && operationNumber.length < 6 && payState === 'idle' && (
-              <p className="text-center text-[11px] text-slatey-500 mt-2">
-                Ingresa el N° de operación de 6 dígitos para habilitar el pago
-              </p>
+            {!isMercadoPagoCard && (
+              <>
+                <Button
+                  fullWidth
+                  size="lg"
+                  loading={payState === 'processing'}
+                  disabled={!canPay}
+                  onClick={handlePay}
+                >
+                  {payState === 'processing' && (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Procesando…
+                    </>
+                  )}
+                  {payState === 'verified' && (
+                    <>
+                      <CheckCircle2 className="w-5 h-5" />
+                      Depósito confirmado
+                    </>
+                  )}
+                  {(payState === 'idle' || payState === 'rejected') && (
+                    <>Pagar S/ {guarantee.toFixed(2)}</>
+                  )}
+                </Button>
+                {payMethod !== 'card' && operationNumber.length < 6 && payState === 'idle' && (
+                  <p className="text-center text-[11px] text-slatey-500 mt-2">
+                    Ingresa el N° de operación de 6 dígitos para habilitar el pago
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>
