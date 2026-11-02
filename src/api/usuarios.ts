@@ -51,3 +51,27 @@ export const registrarDispositivo = (token: string, sistemaOperativo: SistemaOpe
 /** Deja de enviar push a este celular (llamarlo antes de cerrar sesión). 204. */
 export const quitarDispositivo = (token: string) =>
   api<void>('/api/usuarios/yo/dispositivos/quitar', { method: 'POST', body: { token } });
+
+export type NotificacionUsuario = {
+  id: string;
+  tipo: string;
+  titulo: string;
+  mensaje: string;
+  citaId: string | null;
+  creadoEn: string;
+  leida: boolean;
+};
+
+export type BandejaNotificaciones = {
+  noLeidas: number;
+  notificaciones: NotificacionUsuario[];
+};
+
+export const misNotificaciones = (signal?: AbortSignal) =>
+  api<BandejaNotificaciones>('/api/usuarios/yo/notificaciones', { signal });
+
+export const marcarNotificacionLeida = (id: string) =>
+  api<NotificacionUsuario>(`/api/usuarios/yo/notificaciones/${id}/leida`, { method: 'PATCH' });
+
+export const marcarTodasNotificacionesLeidas = () =>
+  api<{ marcadas: number }>('/api/usuarios/yo/notificaciones/leidas', { method: 'PATCH' });

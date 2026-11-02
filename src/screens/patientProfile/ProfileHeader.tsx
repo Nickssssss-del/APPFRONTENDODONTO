@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Camera, CheckCircle2, Mail, Shield } from 'lucide-react';
+import { Camera, Mail, Shield } from 'lucide-react';
 import SmartImage from '@/components/SmartImage';
 import type { UserProfile } from '@/types';
 
@@ -7,6 +7,15 @@ interface Props {
   user: UserProfile;
   avatarUrl: string | null;
   onAvatarChange: (file: File) => void;
+}
+
+function VerifiedBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2 py-1 text-[11px] font-semibold text-success-700">
+      {icon}
+      {label}
+    </span>
+  );
 }
 
 /** Masks DNI: shows only last 3 digits — e.g. "12345678" → "·····678" */
@@ -102,4 +111,3 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
     </div>
   );
 }
-
