@@ -67,6 +67,39 @@ export class ApiError extends Error {
   }
 }
 
+/* ───────── network error handling ───────── */
+let consecutiveNetworkErrors = 0;
+let networkDown = false;
+let networkDownSince = 0;
+const MAX_NETWORK_ERRORS = 3;
+/** Pasado este tiempo en modo offline se permite un intento real para comprobar si volvió la conexión. */
+const NETWORK_RETRY_AFTER_MS = 5000;
+
+function markNetworkSuccess() {
+  consecutiveNetworkErrors = 0;
+  networkDown = false;
+}
+
+/** true solo mientras estamos en modo offline y aún no toca reintentar. */
+function isNetworkBlocked(): boolean {
+  return networkDown && Date.now() - networkDownSince < NETWORK_RETRY_AFTER_MS;
+}
+
+if (typeof window !== 'undefined') {
+  // Al recuperar internet el dispositivo, salimos del modo offline de inmediato.
+  window.addEventListener('online', markNetworkSuccess);
+}
+
+function markNetworkError() {
+  consecutiveNetworkErrors += 1;
+  if (consecutiveNetworkErrors >= MAX_NETWORK_ERRORS) {
+    const wasDown = networkDown;
+    networkDown = true;
+    networkDownSince = Date.now();
+    if (!wasDown) window.dispatchEvent(new CustomEvent('odonto:network-down'));
+  }
+}
+
 /* ───────── refresh con "single flight" ───────── */
 let refreshing: Promise<boolean> | null = null;
 
@@ -139,14 +172,21 @@ export async function api<T = void>(path: string, opts: RequestOptions = {}): Pr
     });
   };
 
+  if (isNetworkBlocked()) {
+    throw new ApiError(0, 'Sin conexión con el servidor (modo offline).');
+  }
+
   let res: Response;
   try {
     res = await doFetch();
     if (res.status === 401 && auth && (await tryRefresh())) res = await doFetch();
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
+    markNetworkError();
     throw new ApiError(0, 'No pudimos conectar con el servidor. Revisa tu internet e inténtalo de nuevo.');
   }
+
+  markNetworkSuccess();
 
   if (res.status === 401 && auth) {
     clearTokens();
@@ -176,6 +216,10 @@ export async function api<T = void>(path: string, opts: RequestOptions = {}): Pr
  * Un <a href> normal no sirve: el access token vive en memoria y no viaja solo.
  */
 export async function apiBlob(path: string, query?: Query): Promise<Blob> {
+  if (isNetworkBlocked()) {
+    throw new ApiError(0, 'Sin conexión con el servidor (modo offline).');
+  }
+
   const doFetch = () =>
     fetch(buildUrl(path, query), { headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
 
@@ -184,8 +228,12 @@ export async function apiBlob(path: string, query?: Query): Promise<Blob> {
     res = await doFetch();
     if (res.status === 401 && (await tryRefresh())) res = await doFetch();
   } catch {
+    markNetworkError();
     throw new ApiError(0, 'No pudimos conectar con el servidor. Revisa tu internet e inténtalo de nuevo.');
   }
+
+  markNetworkSuccess();
+
   if (!res.ok) {
     let mensaje = 'No se pudo descargar el archivo';
     try {

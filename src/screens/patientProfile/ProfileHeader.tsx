@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Camera, CheckCircle2, Mail, Phone, Shield } from 'lucide-react';
+import { Camera, CheckCircle2, Mail, Shield } from 'lucide-react';
 import SmartImage from '@/components/SmartImage';
 import type { UserProfile } from '@/types';
 
@@ -57,9 +57,9 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
             <button
               onClick={() => fileRef.current?.click()}
               aria-label="Cambiar foto de perfil"
-              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary-500 border-2 border-white flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors"
+              className="absolute -bottom-2 -right-2 w-11 h-11 rounded-full bg-primary-500 border-2 border-white flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors"
             >
-              <Camera className="w-3.5 h-3.5 text-white" />
+              <Camera className="w-4 h-4 text-white" aria-hidden="true" />
             </button>
             {/* Hidden file input — accepts images for circular crop */}
             <input
@@ -67,6 +67,7 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
               type="file"
               accept="image/*"
               className="sr-only"
+              tabIndex={-1}
               aria-hidden="true"
               onChange={handleFileChange}
             />
@@ -91,10 +92,7 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
 
             {/* Verified badges */}
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {user.phone && (
-                <VerifiedBadge icon={<Phone className="w-3 h-3" />} label="Teléfono verificado" />
-              )}
-              {user.email && (
+              {user.email && user.emailVerified && (
                 <VerifiedBadge icon={<Mail className="w-3 h-3" />} label="Correo verificado" />
               )}
             </div>
@@ -102,16 +100,6 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
         </div>
       </div>
     </div>
-  );
-}
-
-function VerifiedBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-success-50 border border-success-100 text-success-700 text-[10px] font-semibold">
-      <CheckCircle2 className="w-2.5 h-2.5" />
-      {icon}
-      {label}
-    </span>
   );
 }
 

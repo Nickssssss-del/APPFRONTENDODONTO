@@ -4,29 +4,20 @@ import type { CardFields, CardErrors } from './types';
 import { luhn, formatCardNumber, formatExpiry, validateExpiry } from './cardUtils';
 
 interface Props {
-  provider: 'culqi' | 'niubiz';
+  /** simulado: no se cobra nada (demo). mercadopago: la tarjeta la procesa Mercado Pago, nunca nuestro backend. */
+  modo: 'simulado' | 'mercadopago';
   /**
-   * Called with a one-time token from the payment provider.
-   * The parent must call the tokenization SDK here and receive the token.
-   *
-   * INTEGRATION POINT (Culqi / Niubiz):
-   *   Culqi example:
-   *     Culqi.createToken(cardData, (token) => onToken(token.id));
-   *   Niubiz example:
-   *     niubiz.tokenize(cardData).then((token) => onToken(token.transactionToken));
-   *
-   * Raw card numbers and CVV are NEVER stored in persistent state, logs, or
-   * localStorage. They exist only in local React state for the lifetime of
-   * this component and are cleared after tokenization.
+   * Los datos de la tarjeta viven solo en el estado local de este componente: nunca se guardan ni se envían
+   * a nuestro backend. Con Mercado Pago se tokenizan en su SDK; en modo simulado no salen del teléfono.
    */
   onReadyToTokenize?: (fields: CardFields) => void;
   disabled?: boolean;
 }
 
 const FIELD_CLASS =
-  'w-full px-4 py-3.5 rounded-2xl border-2 bg-slatey-50 text-slatey-900 placeholder:text-slatey-400 focus:bg-white focus:outline-none transition-all';
+  'w-full px-4 py-3.5 rounded-2xl border-2 bg-slatey-50 text-slatey-900 placeholder:text-slatey-500 focus:bg-white focus:outline-none transition-all';
 
-export function CardPanel({ provider, onReadyToTokenize, disabled }: Props) {
+export function CardPanel({ modo, onReadyToTokenize, disabled }: Props) {
   // Ephemeral state — never persisted
   const [fields, setFields] = useState<CardFields>({
     number: '',
@@ -96,21 +87,22 @@ export function CardPanel({ provider, onReadyToTokenize, disabled }: Props) {
   return (
     <div className="bg-white rounded-2xl border border-slatey-100 p-4 space-y-3">
       <div className="flex items-center gap-2 mb-1">
-        <CreditCard className="w-4 h-4 text-primary-500" />
+        <CreditCard className="w-4 h-4 text-primary-500" aria-hidden="true" />
         <span className="text-xs font-semibold text-slatey-600 uppercase tracking-wide">
           Tarjeta de crédito o débito
         </span>
-        <span className="ml-auto text-[10px] text-slatey-400 uppercase font-semibold">
-          {provider}
+        <span className="ml-auto text-[10px] text-slatey-500 uppercase font-semibold">
+          {modo === 'mercadopago' ? 'Mercado Pago' : 'Prueba'}
         </span>
       </div>
 
       {/* Card number */}
       <div>
-        <label className="block text-sm font-semibold text-slatey-700 mb-1.5">
+        <label htmlFor="tarjeta-numero" className="block text-sm font-semibold text-slatey-700 mb-1.5">
           Número de tarjeta
         </label>
         <input
+          id="tarjeta-numero"
           type="text"
           inputMode="numeric"
           autoComplete="cc-number"
@@ -135,10 +127,11 @@ export function CardPanel({ provider, onReadyToTokenize, disabled }: Props) {
 
       {/* Holder */}
       <div>
-        <label className="block text-sm font-semibold text-slatey-700 mb-1.5">
+        <label htmlFor="tarjeta-titular" className="block text-sm font-semibold text-slatey-700 mb-1.5">
           Nombre en la tarjeta
         </label>
         <input
+          id="tarjeta-titular"
           type="text"
           autoComplete="cc-name"
           placeholder="Como aparece en la tarjeta"
@@ -160,10 +153,11 @@ export function CardPanel({ provider, onReadyToTokenize, disabled }: Props) {
       {/* Expiry + CVV */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-semibold text-slatey-700 mb-1.5">
+          <label htmlFor="tarjeta-vencimiento" className="block text-sm font-semibold text-slatey-700 mb-1.5">
             Vencimiento
           </label>
           <input
+          id="tarjeta-vencimiento"
             type="text"
             inputMode="numeric"
             autoComplete="cc-exp"
@@ -184,10 +178,11 @@ export function CardPanel({ provider, onReadyToTokenize, disabled }: Props) {
           )}
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slatey-700 mb-1.5">
+          <label htmlFor="tarjeta-cvv" className="block text-sm font-semibold text-slatey-700 mb-1.5">
             CVV
           </label>
           <input
+          id="tarjeta-cvv"
             type="password"
             inputMode="numeric"
             autoComplete="cc-csc"
@@ -211,10 +206,10 @@ export function CardPanel({ provider, onReadyToTokenize, disabled }: Props) {
 
       {/* Security notice */}
       <div className="flex items-center gap-2 pt-1">
-        <Lock className="w-3.5 h-3.5 text-success-500 flex-shrink-0" />
-        <p className="text-[11px] text-slatey-400 leading-snug">
-          Tu tarjeta se tokeniza con {provider === 'culqi' ? 'Culqi' : 'Niubiz'}.
-          Nunca guardamos tu número ni CVV.
+        <Lock className="w-3.5 h-3.5 text-success-600 flex-shrink-0" aria-hidden="true" />
+        <p className="text-[11px] text-slatey-500 leading-snug">
+          {modo === 'mercadopago' ? 'Tu tarjeta la procesa Mercado Pago.' : 'Pago de prueba: no se realiza ningún cobro.'}
+          {' '}Nunca guardamos tu número ni CVV.
         </p>
       </div>
     </div>

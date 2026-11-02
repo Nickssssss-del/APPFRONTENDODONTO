@@ -68,7 +68,7 @@ export function QrPanel({ method, guarantee, operationNumber, onOperationNumberC
       {/* QR placeholder */}
       <div className="flex flex-col items-center">
         <div className="w-44 h-44 bg-slatey-900 rounded-2xl p-3 mb-3 relative overflow-hidden select-none">
-          {/* Pixel grid — replace with real Culqi QR image */}
+          {/* Ilustración del QR: en modo simulado no hay QR real que escanear */}
           <QrPixels />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-xl bg-white p-1.5">
             <div
@@ -125,10 +125,11 @@ export function QrPanel({ method, guarantee, operationNumber, onOperationNumberC
 
       {/* Operation number input */}
       <div>
-        <label className="block text-sm font-semibold text-slatey-700 mb-1.5">
+        <label htmlFor="numero-operacion" className="block text-sm font-semibold text-slatey-700 mb-1.5">
           N° de operación
         </label>
         <input
+          id="numero-operacion"
           type="text"
           inputMode="numeric"
           value={operationNumber}
@@ -137,11 +138,10 @@ export function QrPanel({ method, guarantee, operationNumber, onOperationNumberC
           }
           placeholder="6 dígitos"
           maxLength={6}
-          aria-label="Número de operación de 6 dígitos"
           aria-describedby="op-hint"
-          className="w-full px-4 py-3.5 rounded-2xl border-2 border-slatey-200 bg-slatey-50 text-slatey-900 placeholder:text-slatey-400 focus:border-primary-400 focus:bg-white focus:outline-none text-center text-xl font-bold tracking-widest transition-all"
+          className="w-full px-4 py-3.5 rounded-2xl border-2 border-slatey-200 bg-slatey-50 text-slatey-900 placeholder:text-slatey-500 focus:border-primary-400 focus:bg-white focus:outline-none text-center text-xl font-bold tracking-widest transition-all"
         />
-        <p id="op-hint" className="mt-1 text-[11px] text-slatey-400 text-center">
+        <p id="op-hint" className="mt-1 text-[11px] text-slatey-500 text-center">
           Aparece en la notificación de {appName} tras el pago
         </p>
       </div>
@@ -156,7 +156,7 @@ export function QrPanel({ method, guarantee, operationNumber, onOperationNumberC
   );
 }
 
-/** Deterministic pixel QR placeholder — replace with a real <img> from Culqi */
+/** QR ilustrativo (determinista) mientras el modo de pagos sea simulado. */
 function QrPixels() {
   // Seeded so it doesn't re-render on every keystroke
   const cells = Array.from({ length: 64 }, (_, i) => ((i * 3 + 7) % 11) > 4);

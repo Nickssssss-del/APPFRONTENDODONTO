@@ -53,7 +53,7 @@ export default function DentistProfile() {
             <div className="flex items-center gap-2 flex-wrap">
               {d.colegiaturaVerificada && <Badge variant="success" size="sm"><BadgeCheck className="w-3.5 h-3.5" /> COP {d.numeroColegiatura} verificado</Badge>}
               {Number(d.totalResenas ?? 0) > 0 && (
-                <span className="flex items-center gap-1 text-xs font-bold text-slatey-900"><Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />{Number(d.calificacion ?? 0).toFixed(1)} <span className="font-normal text-slatey-400">({d.totalResenas} reseñas)</span></span>
+                <span className="flex items-center gap-1 text-xs font-bold text-slatey-900"><Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />{Number(d.calificacion ?? 0).toFixed(1)} <span className="font-normal text-slatey-500">({d.totalResenas} reseñas)</span></span>
               )}
             </div>
 
@@ -79,7 +79,7 @@ export default function DentistProfile() {
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="text-sm font-bold text-slatey-900">{soles(s.precioTotal)}</p>
-                        <p className="text-[10px] text-slatey-400">Depósito {soles(s.montoDeposito)}</p>
+                        <p className="text-[10px] text-slatey-500">Depósito {soles(s.montoDeposito)}</p>
                       </div>
                     </div>
                   ))}
@@ -127,7 +127,7 @@ export default function DentistProfile() {
                       <span className="flex items-center gap-0.5 text-xs font-bold text-slatey-900"><Star className="w-3 h-3 fill-amber-400 text-amber-400" />{r.calificacion}</span>
                     </div>
                     {r.comentario && <p className="text-xs text-slatey-600 mt-1 leading-relaxed">{r.comentario}</p>}
-                    <p className="text-[10px] text-slatey-400 mt-1">{diaLima(r.creadoEn)}</p>
+                    <p className="text-[10px] text-slatey-500 mt-1">{diaLima(r.creadoEn)}</p>
                   </div>
                 ))}
               </div>

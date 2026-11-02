@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Settings, LayoutDashboard, Calendar, Users, UserCog, Bot,
+  Settings, LayoutDashboard, Calendar, Users, UserCog, Bot, ClipboardCheck,
 } from 'lucide-react';
 import { useApp } from '@/storeHooks';
 import type { DentistTab } from '@/types';
@@ -9,12 +9,14 @@ import Agenda from './dentist/Agenda';
 import PatientDetail from './dentist/PatientDetail';
 import Patients from './dentist/Patients';
 import Profile from './dentist/Profile';
+import Gestion from './dentist/Gestion';
 import SmartImage from '@/components/SmartImage';
 
 const TABS: { id: DentistTab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'dashboard', label: 'Inicio', icon: LayoutDashboard },
   { id: 'agenda', label: 'Agenda', icon: Calendar },
   { id: 'patients', label: 'Pacientes', icon: Users },
+  { id: 'gestion', label: 'Gestión', icon: ClipboardCheck },
   { id: 'history', label: 'Perfil', icon: UserCog },
 ];
 
@@ -86,6 +88,7 @@ export default function DentistPanel() {
               )}
               {dentistTab === 'agenda' && <Agenda onGoToPatient={handleGoToPatient} />}
               {dentistTab === 'patients' && <Patients onGoToPatient={handleGoToPatient} />}
+              {dentistTab === 'gestion' && <Gestion />}
               {dentistTab === 'history' && <Profile />}
             </motion.div>
           )}
@@ -95,7 +98,7 @@ export default function DentistPanel() {
       {/* Bottom Navigation */}
       {!showPatientDetail && (
         <div className="fixed bottom-0 left-0 right-0 z-30">
-          <div className="max-w-md mx-auto bg-white border-t border-slatey-100 px-2 py-2 flex justify-around items-center">
+          <nav aria-label="Secciones del consultorio" className="max-w-md mx-auto bg-white border-t border-slatey-100 px-2 py-2 flex justify-around items-center">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const active = dentistTab === tab.id;
@@ -103,7 +106,8 @@ export default function DentistPanel() {
                 <button
                   key={tab.id}
                   onClick={() => setDentistTab(tab.id)}
-                  className="relative flex flex-col items-center gap-1 px-3 py-2 transition-colors"
+                  aria-current={active ? 'page' : undefined}
+                  className="relative flex min-h-[44px] min-w-[44px] flex-col items-center gap-1 px-2 py-2 transition-colors"
                 >
                   {active && (
                     <motion.div
@@ -112,14 +116,14 @@ export default function DentistPanel() {
                       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                     />
                   )}
-                  <span className={`relative z-10 flex flex-col items-center gap-0.5 transition-colors ${active ? 'text-primary-600' : 'text-slatey-400'}`}>
-                    <Icon className="w-5 h-5" />
+                  <span className={`relative z-10 flex flex-col items-center gap-0.5 transition-colors ${active ? 'text-primary-600' : 'text-slatey-500'}`}>
+                    <Icon className="w-5 h-5" aria-hidden="true" />
                     <span className="text-[10px] font-semibold">{tab.label}</span>
                   </span>
                 </button>
               );
             })}
-          </div>
+          </nav>
         </div>
       )}
       {/* Acceso al chatbot */}

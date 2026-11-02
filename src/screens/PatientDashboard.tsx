@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   Clock, MapPin, Star, Lock, FileText, AlertCircle, MessageCircle, Settings, Calendar, Upload, ArrowRight,
-  CheckCircle2, Navigation, BadgeCheck, Loader2, Stethoscope,
+  CheckCircle2, Navigation, Loader2, Stethoscope,
 } from 'lucide-react';
 import { useApp } from '../storeHooks';
 import { Button, Badge, Modal } from '../components/ui';
@@ -13,6 +13,7 @@ import { buscarOdontologos } from '../api/catalog';
 import { apelarInasistencia, miReputacion } from '../api/panel';
 import { diaLima, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '../lib/format';
 import type { CitaApi } from '../api/citas';
+import PatientMap from '@/components/PatientMap';
 
 const PLAZO_APELACION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -159,6 +160,15 @@ export default function PatientDashboard() {
           </div>
         )}
 
+        {/* Mapa interactivo de odontólogos cercanos */}
+        <div className="mb-5 h-64 w-full">
+          <PatientMap
+            dentists={lista}
+            center={coords ?? { lat: -12.0464, lng: -77.0428 }}
+            zoom={12}
+          />
+        </div>
+
         {/* Odontólogos (reales) */}
         <div>
           <div className="flex items-center justify-between mb-3 px-1">
@@ -185,7 +195,7 @@ export default function PatientDashboard() {
                   <p className="text-sm font-bold text-slatey-900 truncate">{o.nombre}</p>
                   <p className="text-xs text-slatey-500 truncate"><Stethoscope className="w-3 h-3 inline mr-1" />{o.especialidades[0] ?? 'Odontología general'}{o.distrito ? ` · ${o.distrito}` : ''}</p>
                   <div className="flex items-center gap-2 mt-1 text-[11px] text-slatey-500">
-                    {Number(o.totalResenas ?? 0) > 0 && <span className="flex items-center gap-0.5 font-bold text-slatey-900"><Star className="w-3 h-3 fill-amber-400 text-amber-400" />{Number(o.calificacion ?? 0).toFixed(1)} <span className="font-normal text-slatey-400">({o.totalResenas})</span></span>}
+                    {Number(o.totalResenas ?? 0) > 0 && <span className="flex items-center gap-0.5 font-bold text-slatey-900"><Star className="w-3 h-3 fill-amber-400 text-amber-400" />{Number(o.calificacion ?? 0).toFixed(1)} <span className="font-normal text-slatey-500">({o.totalResenas})</span></span>}
                     {o.distanciaKm != null && <span>{o.distanciaKm.toFixed(1)} km</span>}
                     {o.precioDesde != null && <span>Desde {soles(o.precioDesde)}</span>}
                   </div>
@@ -204,9 +214,9 @@ export default function PatientDashboard() {
           <div className="flex-1">
             <p className="text-sm font-bold text-slatey-900">Mi estado</p>
             {reputacion.loading ? (
-              <p className="text-xs text-slatey-400">Cargando…</p>
+              <p className="text-xs text-slatey-500">Cargando…</p>
             ) : reputacion.error ? (
-              <p className="text-xs text-slatey-400">No disponible por ahora</p>
+              <p className="text-xs text-slatey-500">No disponible por ahora</p>
             ) : (
               <>
                 <p className="text-xs text-slatey-500"><span className="font-bold text-slatey-900">{strikes}/{limite}</span> inasistencias</p>

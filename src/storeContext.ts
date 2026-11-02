@@ -1,4 +1,4 @@
 import { createContext } from 'react';
-import type { AppState } from './types';
+import type { AppState } from './store';
 
 export const AppContext = createContext<AppState | null>(null);

@@ -338,7 +338,7 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
               </div>
               <p className="text-xl font-extrabold text-slatey-900">{stat.value}</p>
               <p className="text-xs font-semibold text-slatey-600 mt-0.5">{stat.label}</p>
-              <p className="text-[10px] text-slatey-400 mt-0.5">{stat.sub}</p>
+              <p className="text-[10px] text-slatey-500 mt-0.5">{stat.sub}</p>
             </motion.div>
           );
         })}
@@ -404,10 +404,10 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
                 <div className="flex items-center gap-2">
                   <Clock className="w-3 h-3 text-slatey-400" />
                   <span className="text-xs font-bold text-slatey-900">{horaLima(c.inicio)}</span>
-                  <span className="text-xs text-slatey-400">·</span>
+                  <span className="text-xs text-slatey-500">·</span>
                   <span className="text-xs text-slatey-500 truncate">{c.paciente?.nombre ?? 'Paciente'}</span>
                 </div>
-                <p className="text-xs text-slatey-400 mt-0.5 truncate">{c.servicio.titulo}</p>
+                <p className="text-xs text-slatey-500 mt-0.5 truncate">{c.servicio.titulo}</p>
               </div>
               <Badge variant={c.estado === 'CONFIRMADA' ? 'success' : c.estado === 'COMPLETADA' ? 'neutral' : 'warning'} size="sm">
                 {ETIQUETA_ESTADO[c.estado]}

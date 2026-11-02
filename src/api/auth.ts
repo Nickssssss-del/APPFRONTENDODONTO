@@ -25,8 +25,8 @@ export type RegistroInput = {
   aceptaPrivacidad: boolean;
 };
 
-export async function login(correo: string, password: string): Promise<AuthSession> {
-  const s = await api<AuthSession>('/api/auth/login', { method: 'POST', body: { correo, password }, auth: false });
+export async function login(correo: string, password: string, signal?: AbortSignal): Promise<AuthSession> {
+  const s = await api<AuthSession>('/api/auth/login', { method: 'POST', body: { correo, password }, auth: false, signal });
   setTokens(s.accessToken, s.refreshToken);
   return s;
 }
@@ -71,6 +71,24 @@ export async function loginConGoogle(idToken: string, extra: GoogleExtra = {}): 
   const sesion = r as AuthSession;
   setTokens(sesion.accessToken, sesion.refreshToken);
   return { estado: 'sesion', sesion };
+}
+
+/**
+ * POST /api/auth/google/registro: crea la cuenta nueva de Google con los datos que Google no tiene
+ * (documento, teléfono, rol, COP si es odontólogo y aceptaPrivacidad = true) y abre la sesión.
+ */
+export async function registroConGoogle(
+  idToken: string,
+  datos: Required<Pick<GoogleExtra, 'rol' | 'tipoDocumento' | 'numeroDocumento' | 'telefono'>> &
+    Pick<GoogleExtra, 'numeroColegiatura'> & { nombreCompleto?: string; aceptaPrivacidad: true },
+): Promise<AuthSession> {
+  const sesion = await api<AuthSession>('/api/auth/google/registro', {
+    method: 'POST',
+    body: { idToken, ...datos },
+    auth: false,
+  });
+  setTokens(sesion.accessToken, sesion.refreshToken);
+  return sesion;
 }
 
 /** Al abrir la app: si hay refresh token guardado, lo canjea. true = la sesión sigue vigente. */

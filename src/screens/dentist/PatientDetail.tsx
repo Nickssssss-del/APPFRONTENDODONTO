@@ -9,8 +9,8 @@ import { historiasEscritasPara, registrarHistoria, type Historia } from '@/api/p
 import { agruparPacientes, iniciales } from '@/lib/pacientes';
 import { diaLima, fechaIsoLima, horaLima, sumarDias } from '@/lib/format';
 
-const DIAS_ATRAS = 365;
-const DIAS_ADELANTE = 60;
+const DIAS_ATRAS = 0;
+const DIAS_ADELANTE = 30;
 
 type PatientDetailProps = {
   /** id del paciente (usuario) tal como lo devuelve el backend en cita.paciente.id */
@@ -115,6 +115,19 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
               <Mail className="w-4 h-4 text-slatey-400 flex-shrink-0" /> <span className="truncate">{paciente.correo}</span>
             </div>
           )}
+          {/* Alergias y Antecedentes (datos no disponibles en agenda, se muestran placeholders) */}
+          <div className="space-y-2 pt-2 border-t border-slatey-100">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-900">
+              <AlertCircle className="w-4 h-4 text-slatey-400 flex-shrink-0" />
+              <span className="font-semibold">Alergias:</span>
+              <span className="text-slatey-500 ml-2">Ninguna registrada</span>
+            </div>
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-900">
+              <FileText className="w-4 h-4 text-slatey-400 flex-shrink-0" />
+              <span className="font-semibold">Antecedentes:</span>
+              <span className="text-slatey-500 ml-2">Sin antecedentes registrados</span>
+            </div>
+          </div>
         </div>
       </motion.div>
 
@@ -186,7 +199,7 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
           >
             <div>
               <p className="text-sm font-bold text-slatey-900">{h.servicio}</p>
-              <p className="text-[11px] text-slatey-400">{diaLima(h.fechaCita)} · {horaLima(h.fechaCita)}</p>
+              <p className="text-[11px] text-slatey-500">{diaLima(h.fechaCita)} · {horaLima(h.fechaCita)}</p>
             </div>
             <Bloque icon={<Stethoscope className="w-3.5 h-3.5" />} titulo="Diagnóstico" texto={h.diagnostico} />
             <Bloque icon={<Pill className="w-3.5 h-3.5" />} titulo="Tratamiento" texto={h.tratamiento} />

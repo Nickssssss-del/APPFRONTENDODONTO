@@ -4,13 +4,16 @@ import { Button, Input } from '@/components/ui';
 import { useApp } from '@/storeHooks';
 import { ApiError } from '@/api/http';
 import { actualizarYo } from '@/api/usuarios';
+import { CuentaSection } from '@/components/cuenta/CuentaSection';
 
 interface Props {
   onLogout: () => void;
+  /** Tras eliminar la cuenta: limpiar la sesión y volver al inicio. */
+  onCuentaEliminada: () => void;
 }
 
-/** Ajustes que el backend soporta hoy: actualizar teléfono (PATCH /api/usuarios/yo) y cerrar sesión. */
-export function SettingsSection({ onLogout }: Props) {
+/** Ajustes: teléfono (PATCH /api/usuarios/yo), verificación de correo, privacidad, eliminar cuenta y cerrar sesión. */
+export function SettingsSection({ onLogout, onCuentaEliminada }: Props) {
   const { user, setUser } = useApp();
   const [telefono, setTelefono] = useState(user.phone);
   const [guardando, setGuardando] = useState(false);
@@ -34,7 +37,7 @@ export function SettingsSection({ onLogout }: Props) {
   return (
     <div className="p-4 space-y-4">
       <div className="bg-white rounded-2xl border border-slatey-100 p-4 space-y-3">
-        <p className="text-[11px] font-bold text-slatey-400 uppercase tracking-wide">Contacto</p>
+        <p className="text-[11px] font-bold text-slatey-500 uppercase tracking-wide">Contacto</p>
         <Input label="Teléfono" value={telefono} onChange={setTelefono} type="tel" icon={<Phone className="w-5 h-5" />} />
         {msg && <p role={msg.ok ? 'status' : 'alert'} className={`text-xs font-medium ${msg.ok ? 'text-success-600' : 'text-error-600'}`}>{msg.texto}</p>}
         <Button fullWidth size="sm" loading={guardando} disabled={!telefono.trim() || telefono.trim() === user.phone} onClick={guardar}>
@@ -42,7 +45,9 @@ export function SettingsSection({ onLogout }: Props) {
         </Button>
       </div>
 
-      <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-error-50 border-2 border-error-100 text-error-600 font-bold text-sm hover:bg-error-100 transition-colors">
+      <CuentaSection onEliminada={onCuentaEliminada} />
+
+      <button onClick={onLogout} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-error-50 border-2 border-error-100 text-error-700 font-bold text-sm hover:bg-error-100 transition-colors">
         <LogOut className="w-4 h-4" /> Cerrar sesión
       </button>
     </div>

@@ -125,7 +125,7 @@ export function AppointmentSummary({
                   <span className="font-bold text-success-600">S/ {guarantee.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-slatey-400">Saldo a pagar en clínica</span>
+                  <span className="text-slatey-500">Saldo a pagar en clínica</span>
                   <span className="font-semibold text-slatey-700">S/ {balance.toFixed(2)}</span>
                 </div>
                 <div className="h-px bg-slatey-100" />

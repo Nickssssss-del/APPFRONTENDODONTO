@@ -77,7 +77,7 @@ export default function GoogleButton({ onCredential, disabled }: Props) {
         type="button"
         disabled
         title={CLIENT_ID ? 'No se pudo cargar Google. Revisa tu conexión.' : 'Falta VITE_GOOGLE_CLIENT_ID'}
-        className="w-full py-3 px-4 rounded-2xl bg-slatey-50 border border-slatey-200 text-slatey-400 font-bold text-xs cursor-not-allowed"
+        className="w-full py-3 px-4 rounded-2xl bg-slatey-50 border border-slatey-200 text-slatey-500 font-bold text-xs cursor-not-allowed"
       >
         Google no disponible
       </button>
@@ -88,7 +88,7 @@ export default function GoogleButton({ onCredential, disabled }: Props) {
     <div className={`relative flex justify-center min-h-[44px] ${disabled ? 'pointer-events-none opacity-60' : ''}`}>
       <div ref={host} className="w-full flex justify-center" />
       {estado === 'cargando' && (
-        <span className="absolute inset-0 flex items-center justify-center text-xs text-slatey-400">Cargando Google…</span>
+        <span className="absolute inset-0 flex items-center justify-center text-xs text-slatey-500">Cargando Google…</span>
       )}
     </div>
   );

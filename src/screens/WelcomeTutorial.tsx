@@ -135,7 +135,7 @@ function BookingIllustration({ reduce }: { reduce: boolean }) {
               transition={{ type: 'spring', stiffness: 400, damping: 18 }}
               className={`rounded-xl py-2.5 text-center text-xs font-bold ${
                 isTaken
-                  ? 'bg-slatey-200 text-slatey-400 line-through'
+                  ? 'bg-slatey-200 text-slatey-500 line-through'
                   : isSel
                     ? 'bg-primary-500 text-white shadow-md shadow-primary-500/30'
                     : 'bg-white text-slatey-700'

@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Calendar, Clock, AlertCircle, CheckCircle2, ArrowRight, ArrowLeft,
+  Calendar, AlertCircle, ArrowRight, ArrowLeft,
 } from 'lucide-react';
 import { useApp } from '@/storeHooks';
-import { Button, Badge } from '@/components/ui';
+import { Button } from '@/components/ui';
 
 export default function ConfirmarCita() {
   const {
@@ -12,7 +12,6 @@ export default function ConfirmarCita() {
     selectedDentistName,
     selectedDay,
     selectedTime,
-    user,
     setScreen,
   } = useApp();
   const [confirming, setConfirming] = useState(false);
@@ -41,8 +40,8 @@ export default function ConfirmarCita() {
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
           <div className="flex items-center gap-3">
-            <button onClick={handleBack} className="p-2 -ml-2 rounded-xl hover:bg-slatey-100">
-              <ArrowLeft className="w-5 h-5 text-slatey-700" />
+            <button onClick={handleBack} aria-label="Volver" className="p-2.5 -ml-2 rounded-xl hover:bg-slatey-100">
+              <ArrowLeft className="w-5 h-5 text-slatey-700" aria-hidden="true" />
             </button>
             <div>
               <h2 className="text-lg font-bold text-slatey-900 font-display">Confirmar Cita</h2>

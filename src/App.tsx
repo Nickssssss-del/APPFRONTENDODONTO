@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { Component, ErrorInfo, ReactNode, useEffect } from 'react';
 import { AppProvider } from './store';
 import { useApp } from './storeHooks';
@@ -15,6 +15,7 @@ import Chatbot from './screens/Chatbot';
 import DentistProfile from './screens/DentistProfile';
 import PatientProfile from './screens/PatientProfile';
 import ConfirmarCita from './screens/ConfirmarCita';
+import ApelacionScreen from './screens/ApelacionScreen';
 import DiagnosticoConexion from './screens/DiagnosticoConexion';
 import SettingsModal from './components/SettingsModal';
 import PatientBottomNav from './components/PatientBottomNav';
@@ -156,17 +157,18 @@ const PRE_AUTH_SCREENS = new Set<Screen>(['splash', 'tutorial', 'onboarding']);
 const SHOW_DIAGNOSTICO = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('diagnostico');
 
 function AppContent() {
-  const { screen, setScreen, isAuth, role, sessionLoading } = useApp();
+  const { screen, setScreen, isAuth, role, sessionLoading, perfilListo } = useApp();
   const isPatientScreen = PATIENT_SCREENS.has(screen);
 
   // Sesión restaurada con el refresh token (o login/registro): salta splash, tutorial y login y entra directo
-  // al panel que corresponde al rol REAL que devolvió el servidor.
+  // al panel que corresponde al rol REAL que devolvió el servidor. Espera a /api/usuarios/yo: antes de eso
+  // el rol es el valor por defecto ('patient') y un odontólogo terminaba en el panel del paciente.
   useEffect(() => {
-    if (sessionLoading || !isAuth) return;
+    if (sessionLoading || !isAuth || !perfilListo) return;
     if (PRE_AUTH_SCREENS.has(screen)) {
       setScreen(role === 'dentist' ? 'dentistPanel' : 'patientDashboard');
     }
-  }, [sessionLoading, isAuth, role, screen, setScreen]);
+  }, [sessionLoading, isAuth, perfilListo, role, screen, setScreen]);
 
   // Protección de rutas: sin sesión no se entra a pantallas de paciente ni al panel del odontólogo.
   // (El marketplace es público en el backend, así que se deja abierto para explorar antes de registrarse.)
@@ -214,6 +216,7 @@ function AppContent() {
                 {screen === 'dentistProfile' && <DentistProfile />}
                 {screen === 'patientProfile' && <PatientProfile />}
                 {screen === 'confirmarCita' && <ConfirmarCita />}
+                {screen === 'apelacion' && <ApelacionScreen />}
               </motion.div>
             </AnimatePresence>
           </ErrorBoundary>
@@ -231,8 +234,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppContent />
-    </AppProvider>
+    <MotionConfig reducedMotion="user">
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </MotionConfig>
   );
 }

@@ -269,10 +269,10 @@ function TourOverlay({ step, stepIndex, totalSteps, targetRect, onNext, onPrev, 
               </div>
               <button
                 onClick={onSkip}
-                className="p-1 rounded-lg hover:bg-slatey-100 transition-colors text-slatey-400 flex-shrink-0"
+                className="-m-2 p-3 rounded-lg hover:bg-slatey-100 transition-colors text-slatey-500 flex-shrink-0"
                 aria-label="Saltar tour"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4" aria-hidden="true" />
               </button>
             </div>
 

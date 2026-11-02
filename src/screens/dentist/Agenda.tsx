@@ -149,7 +149,7 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
                     <div className="flex items-center gap-2">
                       <Clock className="w-3.5 h-3.5 text-slatey-400" />
                       <span className="text-sm font-bold text-slatey-900">{horaLima(c.inicio)}</span>
-                      <span className="text-xs text-slatey-400">·</span>
+                      <span className="text-xs text-slatey-500">·</span>
                       <span className="text-xs text-slatey-500 truncate">{c.servicio.titulo}</span>
                     </div>
                     <p className="text-sm font-semibold text-slatey-900 mt-0.5">{nombre}</p>

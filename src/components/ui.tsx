@@ -1,4 +1,5 @@
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode, useEffect } from 'react';
+import { forwardRef, type ButtonHTMLAttributes, type ReactNode, useEffect, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Loader2 } from 'lucide-react';
 
@@ -25,8 +26,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     secondary: 'bg-slatey-900 text-white hover:bg-slatey-800',
     outline: 'border-2 border-slatey-200 text-slatey-700 hover:border-primary-400 hover:text-primary-600 bg-white',
     ghost: 'text-slatey-600 hover:bg-slatey-100',
-    danger: 'bg-error-500 text-white hover:bg-error-600 shadow-sm shadow-error-500/30',
-    success: 'bg-success-500 text-white hover:bg-success-600 shadow-sm shadow-success-500/30',
+    danger: 'bg-error-600 text-white hover:bg-error-700 shadow-sm shadow-error-500/30',
+    success: 'bg-success-600 text-white hover:bg-success-700 shadow-sm shadow-success-500/30',
   };
   const sizes = {
     sm: 'px-4 py-2 text-sm rounded-xl',
@@ -57,7 +58,7 @@ export function Badge({ children, variant = 'neutral', size = 'sm', className = 
   const variants = {
     primary: 'bg-primary-50 text-primary-700 border-primary-200',
     success: 'bg-success-50 text-success-700 border-success-100',
-    warning: 'bg-warning-50 text-warning-600 border-warning-100',
+    warning: 'bg-warning-50 text-warning-700 border-warning-100',
     error: 'bg-error-50 text-error-700 border-error-100',
     neutral: 'bg-slatey-100 text-slatey-600 border-slatey-200',
     accent: 'bg-accent-50 text-accent-700 border-accent-200',
@@ -89,7 +90,8 @@ export function Modal({ open, onClose, title, children, className = '' }: ModalP
     }
   }, [open]);
 
-  return (
+  // Portal a <body>: dentro de las pantallas animadas (transform) el z-50 quedaba por debajo de la barra inferior.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -98,8 +100,11 @@ export function Modal({ open, onClose, title, children, className = '' }: ModalP
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
         >
-          <div className="absolute inset-0 bg-slatey-900/50 backdrop-blur-sm" onClick={onClose} />
+          <div className="absolute inset-0 bg-slatey-900/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             initial={{ y: '100%', opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
@@ -109,8 +114,8 @@ export function Modal({ open, onClose, title, children, className = '' }: ModalP
             {title && (
               <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-slatey-100 bg-white rounded-t-3xl">
                 <h3 className="text-lg font-bold text-slatey-900 font-display">{title}</h3>
-                <button onClick={onClose} className="p-2 rounded-xl hover:bg-slatey-100 transition-colors">
-                  <X className="w-5 h-5 text-slatey-500" />
+                <button onClick={onClose} aria-label="Cerrar" className="p-2.5 rounded-xl hover:bg-slatey-100 transition-colors">
+                  <X className="w-5 h-5 text-slatey-500" aria-hidden="true" />
                 </button>
               </div>
             )}
@@ -118,18 +123,25 @@ export function Modal({ open, onClose, title, children, className = '' }: ModalP
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
 type ToggleProps = {
   checked: boolean;
   onChange: (v: boolean) => void;
+  /** Texto para lectores de pantalla (el interruptor no tiene texto visible). */
+  label?: string;
 };
 
-export function Toggle({ checked, onChange }: ToggleProps) {
+export function Toggle({ checked, onChange, label }: ToggleProps) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={!!checked}
+      aria-label={label}
       onClick={() => onChange(!checked)}
       className={`relative w-12 h-7 rounded-full transition-colors duration-200 ${checked ? 'bg-primary-500' : 'bg-slatey-300'}`}
     >
@@ -151,21 +163,30 @@ type InputProps = {
   icon?: ReactNode;
   maxLength?: number;
   className?: string;
+  id?: string;
+  inputMode?: 'text' | 'numeric' | 'tel' | 'email' | 'search';
+  autoComplete?: string;
 };
 
-export function Input({ label, value, onChange, placeholder, type = 'text', icon, maxLength, className = '' }: InputProps) {
+export function Input({ label, value, onChange, placeholder, type = 'text', icon, maxLength, className = '', id, inputMode, autoComplete }: InputProps) {
+  const autoId = useId();
+  const inputId = id ?? autoId;
   return (
     <div className={className}>
-      {label && <label className="block text-sm font-semibold text-slatey-700 mb-1.5">{label}</label>}
+      {label && <label htmlFor={inputId} className="block text-sm font-semibold text-slatey-700 mb-1.5">{label}</label>}
       <div className="relative">
-        {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slatey-400">{icon}</div>}
+        {icon && <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slatey-500" aria-hidden="true">{icon}</div>}
         <input
+          id={inputId}
+          aria-label={label ? undefined : placeholder}
+          inputMode={inputMode}
+          autoComplete={autoComplete}
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           maxLength={maxLength}
-          className={`w-full px-4 py-3.5 rounded-2xl border-2 border-slatey-200 bg-slatey-50 text-slatey-900 placeholder:text-slatey-400 focus:border-primary-400 focus:bg-white focus:outline-none transition-all ${icon ? 'pl-11' : ''}`}
+          className={`w-full px-4 py-3.5 rounded-2xl border-2 border-slatey-200 bg-slatey-50 text-slatey-900 placeholder:text-slatey-500 focus:border-primary-400 focus:bg-white focus:outline-none transition-all ${icon ? 'pl-11' : ''}`}
         />
       </div>
     </div>
@@ -203,8 +224,8 @@ export function TopBar({ title, onBack, rightAction }: TopBarProps) {
       <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
         <div className="flex items-center gap-3">
           {onBack && (
-            <button onClick={onBack} className="p-2 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors">
-              <svg className="w-5 h-5 text-slatey-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <button onClick={onBack} aria-label="Volver" className="p-2.5 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors">
+              <svg aria-hidden="true" className="w-5 h-5 text-slatey-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>

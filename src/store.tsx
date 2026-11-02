@@ -1,13 +1,16 @@
-import { createContext, useContext, useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, AppointmentRequest, DayLabel } from './types';
 import { restoreSession, logout as apiLogout } from './api/auth';
 import { SESSION_EXPIRED_EVENT } from './api/http';
 import { obtenerYo } from './api/usuarios';
+import { activarPush, desactivarPush } from './lib/push';
 import { agendaOdontologo, cancelarCita, confirmarCita, misCitas, pagarDeposito, reservarCita, type CitaApi, type MetodoPago } from './api/citas';
-import { TREATMENTS, DENTIST_WORK_SCHEDULE, isRealId, citaToRequest } from './constants';
+import { TREATMENTS, DENTIST_WORK_SCHEDULE, isRealId } from './constants';
 import { AppContext } from './storeContext';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { fechaIsoLima, sumarDias } from '@/lib/format';
 
-type AppState = {
+export type AppState = {
   role: Role;
   setRole: (r: Role) => void;
   screen: Screen;
@@ -39,6 +42,8 @@ type AppState = {
   selectedPatientId: string | null;
   setSelectedPatientId: (id: string | null) => void;
   sessionLoading: boolean;
+  /** true cuando ya llegó /api/usuarios/yo (rol real). Antes de eso no se debe elegir panel. */
+  perfilListo: boolean;
   rememberMe: boolean;
   setRememberMe: (b: boolean) => void;
   showWelcomeBanner: boolean;
@@ -47,6 +52,8 @@ type AppState = {
   setSplashComplete: (b: boolean) => void;
   selectedDentistId: string | null;
   setSelectedDentistId: (id: string | null) => void;
+  appealCitaId: string | null;
+  setAppealCitaId: (id: string | null) => void;
   selectedDay: string;
   setSelectedDay: (d: string) => void;
   selectedTime: string | null;
@@ -82,6 +89,11 @@ type AppState = {
   reservarYPagar: (odontologoId: string, servicioId: string, inicio: string, metodo: MetodoPago) => Promise<CitaApi>;
   /** Cancela una cita real (PATCH /api/citas/{id}/cancelar). */
   cancelarCitaReal: (id: string, motivo?: string) => Promise<void>;
+  /** Odontólogo: confirma una cita (PATCH /api/odontologos/yo/citas/{id}/confirmar) y refresca la agenda. */
+  confirmarCitaReal: (id: string) => Promise<void>;
+  /** Cita que se está pagando en el checkout (retomada desde Mis citas o el chatbot). */
+  activeCita: CitaApi | null;
+  setActiveCita: (c: CitaApi | null) => void;
 };
 
 
@@ -118,16 +130,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [dentistTab, setDentistTab] = useState<DentistTab>('dashboard');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(true);
+  const [perfilListo, setPerfilListo] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [splashComplete, setSplashComplete] = useState(false);
   const [selectedDentistId, setSelectedDentistId] = useState<string | null>(null);
+  const [appealCitaId, setAppealCitaId] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string>('Lun 15');
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedSlotStart, setSelectedSlotStart] = useState<string | null>(null);
   const [selectedDentistName, setSelectedDentistName] = useState<string>('');
   const [agendaLocked, setAgendaLocked] = useState(false);
   const [citas, setCitas] = useState<CitaApi[]>([]);
+  const [activeCita, setActiveCita] = useState<CitaApi | null>(null);
   const [reschedulingRequestId, setReschedulingRequestId] = useState<string | null>(null);
   const [reservedSlots, setReservedSlots] = useState<Record<string, string[]>>({});
   const [dentistWorkSchedules, setDentistWorkSchedules] = useState<Record<string, Record<string, { active: boolean; start: string; end: string }>>>(DENTIST_WORK_SCHEDULE);
@@ -139,12 +154,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
   roleRef.current = role;
 
   const logout = useCallback(() => {
+    // Quita el token push de este celular. La petición sale con el access token actual (se lee al instante,
+    // antes de que apiLogout lo borre); si falla da igual: el backend descarta tokens inválidos.
+    void desactivarPush();
     apiLogout(); // borra access (memoria) y refresh (localStorage)
     isAuthRef.current = false;
     setIsAuth(false);
+    setPerfilListo(false);
     setRole('patient');
     setUser({ fullName: '', email: '', phone: '', dni: '', age: '' });
     setCitas([]);
+    setActiveCita(null);
     setReservedSlots({});
     setSelectedDentistId(null);
     setSelectedTime(null);
@@ -183,6 +203,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await refreshAppointments();
   }, [refreshAppointments]);
 
+  const confirmarCitaReal = useCallback(async (id: string) => {
+    await confirmarCita(id);
+    await refreshAppointments();
+  }, [refreshAppointments]);
+
   const isDayAvailable = (dentistId: string, dayLabel: string): boolean => {
     const schedule = dentistWorkSchedules[dentistId];
     if (!schedule || !schedule[dayLabel]) return false;
@@ -218,23 +243,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return slots;
   };
 
-  const reserveSlot = (dentistId: string, dayLabel: string, time: string) => {
-    const reservedKey = dentistId + ':' + dayLabel;
-    setReservedSlots((current) => ({
-      ...current,
-      [reservedKey]: Array.from(new Set([...(current[reservedKey] || []), time])),
-    }));
-  };
-
-  const releaseSlot = (dentistId: string, dayLabel: string, time: string) => {
-    const reservedKey = dentistId + ':' + dayLabel;
-    setReservedSlots((current) => ({
-      ...current,
-      [reservedKey]: (current[reservedKey] || []).filter((reservedTime) => reservedTime !== time),
-    }));
-  };
-
-   const createAppointmentRequest = (request: Omit<AppointmentRequest, 'id' | 'status' | 'createdAt'>) => {
+   const createAppointmentRequest = (_request: Omit<AppointmentRequest, 'id' | 'status' | 'createdAt'>) => {
      // No-op: simulated requests not needed for current UI
    };
 
@@ -261,11 +270,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
      );
    };
 
-   const rescheduleAppointmentRequest = (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => {
+   const rescheduleAppointmentRequest = (_id: string, _dayLabel: DayLabel, _selectedDay: string, _selectedTime: string) => {
      // No-op: rescheduling logic not needed for current UI
    };
 
-   const dentistRescheduleAppointment = (id: string, dayLabel: DayLabel, selectedDay: string, selectedTime: string) => {
+   const dentistRescheduleAppointment = (_id: string, _dayLabel: DayLabel, _selectedDay: string, _selectedTime: string) => {
      // No-op: dentist rescheduling logic not needed for current UI
    };
 
@@ -309,11 +318,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
           email: yo.correo,
           phone: yo.telefono ?? u.phone,
           dni: yo.numeroDocumento,
+          emailVerified: !!yo.correoVerificado,
         }));
+        void activarPush(); // no hace nada mientras VITE_PUSH_ENABLED no sea "true"
       })
       .catch((e) => console.error('No se pudo cargar el perfil', e))
       .finally(() => {
-        if (!cancelled) void refreshAppointments();
+        if (cancelled) return;
+        setPerfilListo(true);
+        void refreshAppointments();
       });
 
     const timer = setInterval(() => void refreshAppointments(), 60_000);
@@ -350,9 +363,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setHoldSeconds(600);
   };
 
-// El backend (AuthController) solo expone /register, /login y /refresh: todavía NO existe /api/auth/google.
-// Se deja la firma para no romper la UI, pero se informa con claridad en vez de llamar a un endpoint inexistente.
-/* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+  // Firma heredada: el login con Google real vive en api/auth.ts (POST /api/auth/google) y lo usa GoogleButton.
   const loginWithGoogle = async (_idToken: string): Promise<void> => {
     throw new Error('El inicio de sesión con Google aún no está disponible. Usa tu correo y contraseña.');
   };
@@ -376,10 +387,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dentistTab, setDentistTab,
         selectedPatientId, setSelectedPatientId,
         sessionLoading,
+        perfilListo,
         rememberMe, setRememberMe,
         showWelcomeBanner, setShowWelcomeBanner,
         splashComplete, setSplashComplete,
         selectedDentistId, setSelectedDentistId,
+        appealCitaId, setAppealCitaId,
         selectedDay, setSelectedDay,
         selectedTime, setSelectedTime,
         selectedSlotStart, setSelectedSlotStart,
@@ -403,6 +416,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         refreshAppointments,
         reservarYPagar,
         cancelarCitaReal,
+        confirmarCitaReal,
+        activeCita,
+        setActiveCita,
       }}
     >
       {children}

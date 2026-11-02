@@ -51,7 +51,7 @@ export function ResumenTab({ citas, strikes, limiteStrikes, onReserve, onViewDen
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-slatey-800 truncate">{c.odontologo.nombre}</p>
                 <p className="text-[11px] text-slatey-500 truncate">{c.servicio.titulo}</p>
-                <p className="text-[11px] text-slatey-400">{diaLima(c.inicio)}</p>
+                <p className="text-[11px] text-slatey-500">{diaLima(c.inicio)}</p>
               </div>
               <Badge variant={c.estado === 'COMPLETADA' ? 'neutral' : 'error'} size="sm">
                 {c.estado === 'COMPLETADA' ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />} {ETIQUETA_ESTADO[c.estado]}

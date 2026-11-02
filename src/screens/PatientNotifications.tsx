@@ -88,7 +88,7 @@ function Resena({ citaId, odontologo, servicio, onListo }: { citaId: string; odo
 }
 
 export default function PatientNotifications() {
-  const { setScreen, user, citas } = useApp();
+  const { setScreen, setAppealCitaId, user, citas } = useApp();
   const porResenar = useAsync((signal) => citasPorResenar(signal), []);
   const avisos = useMemo(
     () => citas.map(avisoDeCita).filter((a): a is Aviso => a !== null).sort((a, b) => b.fecha.localeCompare(a.fecha)),
@@ -125,7 +125,17 @@ export default function PatientNotifications() {
                   <h3 className="text-sm font-bold text-slatey-900">{a.titulo}</h3>
                   <p className="mt-1 text-xs leading-relaxed text-slatey-600">{a.mensaje}</p>
                   {a.accion && (
-                    <button onClick={() => setScreen(a.accion!.screen)} className="mt-3 flex items-center gap-1.5 rounded-xl bg-slatey-50 px-3 py-2 text-xs font-bold text-primary-600 hover:bg-primary-50">
+                    <button
+                      onClick={() => {
+                        if (a.accion!.label === 'Apelar') {
+                          setAppealCitaId(a.id);
+                          setScreen('apelacion');
+                        } else {
+                          setScreen(a.accion!.screen);
+                        }
+                      }}
+                      className="mt-3 flex items-center gap-1.5 rounded-xl bg-slatey-50 px-3 py-2 text-xs font-bold text-primary-600 hover:bg-primary-50"
+                    >
                       {a.accion.label} <ArrowRight className="h-3.5 w-3.5" />
                     </button>
                   )}

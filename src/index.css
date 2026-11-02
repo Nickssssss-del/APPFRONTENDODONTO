@@ -18,6 +18,24 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
   }
+  button:not(:disabled),
+  [role='button'],
+  label[for],
+  select {
+    cursor: pointer;
+  }
+}
+
+/* Respeta "reducir movimiento" del sistema (Android: Accesibilidad > Quitar animaciones) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 @layer utilities {
