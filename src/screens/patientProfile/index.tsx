@@ -87,7 +87,14 @@ export default function PatientProfileScreen() {
                 </>
               )}
               {tab === 'historial' && (
-                <HistorialTab entries={historias.data ?? []} loading={historias.loading} error={historias.error} onRetry={historias.reload} onReserve={() => setScreen('marketplace')} />
+                <HistorialTab
+                  entries={historias.data ?? []}
+                  attendedAppointments={citas.filter((c) => c.estado === 'COMPLETADA').length}
+                  loading={historias.loading}
+                  error={historias.error}
+                  onRetry={historias.reload}
+                  onReserve={() => setScreen('marketplace')}
+                />
               )}
               {tab === 'comprobantes' && <ComprobantesTab citas={ordenadas} onReserve={() => setScreen('marketplace')} />}
               {tab === 'reclamos' && (

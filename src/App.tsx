@@ -159,6 +159,7 @@ const SHOW_DIAGNOSTICO = import.meta.env.DEV && typeof window !== 'undefined' &&
 function AppContent() {
   const { screen, setScreen, isAuth, role, sessionLoading, perfilListo } = useApp();
   const isPatientScreen = PATIENT_SCREENS.has(screen);
+  const showPatientBottomNav = isPatientScreen && screen !== 'checkout';
 
   // Sesión restaurada con el refresh token (o login/registro): salta splash, tutorial y login y entra directo
   // al panel que corresponde al rol REAL que devolvió el servidor. Espera a /api/usuarios/yo: antes de eso
@@ -222,7 +223,7 @@ function AppContent() {
           </ErrorBoundary>
 
           <SettingsModal />
-          {isPatientScreen && <PatientBottomNav />}
+          {showPatientBottomNav && <PatientBottomNav />}
 
           <TourTrigger config={patientTourConfig} triggerScreen="patientDashboard" />
           <TourTrigger config={dentistTourConfig} triggerScreen="dentistPanel" />
