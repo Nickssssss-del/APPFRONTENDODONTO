@@ -97,7 +97,7 @@ export default function PatientNotifications() {
   };
 
   return (
-    <div className="min-h-screen bg-slatey-50 pb-24">
+    <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
       <div className="sticky top-0 z-30 border-b border-slatey-100 bg-white/95 backdrop-blur-xl">
         <div className="mx-auto max-w-md px-4 py-3 flex items-start justify-between gap-3">
           <div>

@@ -2,25 +2,49 @@ import { Suspense, lazy } from 'react';
 
 const PatientMapInner = lazy(() => import('./PatientMapInner'));
 
+export type PinOdontologo = {
+  id: string;
+  nombre: string;
+  consultorio?: string | null;
+  direccion?: string | null;
+  distrito?: string | null;
+  latitud?: number | null;
+  longitud?: number | null;
+  distanciaKm?: number | null;
+};
+
+export type EstadoUbicacion = 'cargando' | 'lista' | 'denegada' | 'no-disponible';
+
 interface PatientMapProps {
-  dentists: Array<{
-    id: string;
-    nombre: string;
-    consultorio?: string | null;
-    distrito?: string | null;
-    latitud?: number | null;
-    longitud?: number | null;
-    calificacion?: number | null;
-    totalResenas?: number | null;
-  }>;
-  center?: { lat: number; lng: number };
-  zoom?: number;
+  dentists: PinOdontologo[];
+  userLocation?: { lat: number; lng: number } | null;
+  ubicacion: EstadoUbicacion;
+  onCentrar: () => void;
+  onVerPerfil: (id: string) => void;
+  onReservar: (id: string, nombre: string) => void;
+  sinCoordenadas: number;
 }
 
-export default function PatientMap({ dentists, center = { lat: -12.0464, lng: -77.0428 }, zoom = 12 }: PatientMapProps) {
+export default function PatientMap({
+  dentists,
+  userLocation = null,
+  ubicacion,
+  onCentrar,
+  onVerPerfil,
+  onReservar,
+  sinCoordenadas,
+}: PatientMapProps) {
   return (
-    <Suspense fallback={<div className="h-64 w-full flex items-center justify-center bg-slatey-50 rounded-2xl">Cargando mapa…</div>}>
-      <PatientMapInner dentists={dentists} center={center} zoom={zoom} />
+    <Suspense fallback={<div className="flex h-[38dvh] min-h-[220px] max-h-80 w-full items-center justify-center rounded-2xl bg-slatey-50 text-sm text-slatey-500">Cargando mapa…</div>}>
+      <PatientMapInner
+        dentists={dentists}
+        userLocation={userLocation}
+        ubicacion={ubicacion}
+        onCentrar={onCentrar}
+        onVerPerfil={onVerPerfil}
+        onReservar={onReservar}
+        sinCoordenadas={sinCoordenadas}
+      />
     </Suspense>
   );
 }

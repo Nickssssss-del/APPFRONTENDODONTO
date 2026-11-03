@@ -9,36 +9,69 @@ import { Button, Badge, Modal } from '../components/ui';
 import SmartImage from '../components/SmartImage';
 import { useAsync } from '../hooks/useAsync';
 import { ApiError } from '../api/http';
-import { buscarOdontologos } from '../api/catalog';
+import { buscarOdontologos, obtenerOdontologo } from '../api/catalog';
 import { apelarInasistencia, miReputacion } from '../api/panel';
 import { diaLima, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '../lib/format';
 import type { CitaApi } from '../api/citas';
-import PatientMap from '@/components/PatientMap';
+import PatientMap, { type EstadoUbicacion, type PinOdontologo } from '@/components/PatientMap';
 
 const PLAZO_APELACION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function PatientDashboard() {
-  const { setScreen, setSettingsOpen, user, setSelectedDentistId, citas, refreshAppointments } = useApp();
+  const { setScreen, setSettingsOpen, user, setSelectedDentistId, setSelectedDentistName, citas, refreshAppointments } = useApp();
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [ubicacionPedida, setUbicacionPedida] = useState(false);
+  const [ubicacion, setUbicacion] = useState<EstadoUbicacion>('cargando');
 
-  // Ubicación solo para ordenar por cercanía; si el paciente no la da, se listan los mejor calificados.
-  useEffect(() => {
+  const pedirUbicacion = () => {
     if (!navigator.geolocation) {
-      setUbicacionPedida(true);
+      setUbicacion('no-disponible');
       return;
     }
+    setUbicacion('cargando');
     navigator.geolocation.getCurrentPosition(
-      (p) => { setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }); setUbicacionPedida(true); },
-      () => setUbicacionPedida(true),
-      { timeout: 8000 },
+      (p) => {
+        setCoords({ lat: p.coords.latitude, lng: p.coords.longitude });
+        setUbicacion('lista');
+      },
+      (err) => setUbicacion(err.code === err.PERMISSION_DENIED ? 'denegada' : 'no-disponible'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
-  }, []);
+  };
 
+  useEffect(() => { pedirUbicacion(); }, []);
+
+  const listoParaBuscar = ubicacion !== 'cargando';
   const cercanos = useAsync(
-    (signal) => (ubicacionPedida ? buscarOdontologos({ lat: coords?.lat, lng: coords?.lng, tamano: 5 }, signal) : Promise.resolve(null)),
-    [ubicacionPedida, coords?.lat, coords?.lng],
+    (signal) => (listoParaBuscar
+      ? buscarOdontologos({ lat: coords?.lat, lng: coords?.lng, tamano: 8 }, signal)
+      : Promise.resolve(null)),
+    [listoParaBuscar, coords?.lat, coords?.lng],
   );
+  const idsCercanos = useMemo(() => (cercanos.data?.contenido ?? []).map((o) => o.id).join(','), [cercanos.data]);
+  const fichasMapa = useAsync(async (signal) => {
+    const items = cercanos.data?.contenido ?? [];
+    if (!idsCercanos || items.length === 0) return [] as PinOdontologo[];
+    const perfiles = await Promise.all(items.map(async (o) => {
+      try {
+        const p = await obtenerOdontologo(o.id, signal);
+        const pin: PinOdontologo = {
+          id: p.id,
+          nombre: p.nombre,
+          consultorio: p.consultorio,
+          direccion: p.direccion,
+          distrito: p.distrito,
+          latitud: p.latitud == null ? null : Number(p.latitud),
+          longitud: p.longitud == null ? null : Number(p.longitud),
+          distanciaKm: o.distanciaKm ?? null,
+        };
+        return pin;
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') throw e;
+        return null;
+      }
+    }));
+    return perfiles.filter((p): p is PinOdontologo => p !== null);
+  }, [idsCercanos]);
   const reputacion = useAsync((signal) => miReputacion(signal), []);
 
   // Próxima cita real: la más cercana en el futuro que no esté cancelada.
@@ -95,7 +128,7 @@ export default function PatientDashboard() {
   const lista = cercanos.data?.contenido ?? [];
 
   return (
-    <div className="min-h-screen bg-slatey-50 pb-24">
+    <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
       <div className="sticky top-0 z-30 glass border-b border-slatey-100 bg-white/80 backdrop-blur-md">
         <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
           <div className="min-w-0">
@@ -161,11 +194,19 @@ export default function PatientDashboard() {
         )}
 
         {/* Mapa interactivo de odontólogos cercanos */}
-        <div className="mb-5 h-64 w-full">
+        <div className="mb-5 w-full">
           <PatientMap
-            dentists={lista}
-            center={coords ?? { lat: -12.0464, lng: -77.0428 }}
-            zoom={12}
+            dentists={fichasMapa.data ?? []}
+            userLocation={coords}
+            ubicacion={ubicacion}
+            onCentrar={pedirUbicacion}
+            onVerPerfil={(id) => { setSelectedDentistId(id); setScreen('dentistProfile'); }}
+            onReservar={(id, nombre) => { setSelectedDentistId(id); setSelectedDentistName(nombre); setScreen('marketplace'); }}
+            sinCoordenadas={(fichasMapa.data ?? []).filter((d) => {
+              const lat = d.latitud;
+              const lng = d.longitud;
+              return !(typeof lat === 'number' && typeof lng === 'number' && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0));
+            }).length}
           />
         </div>
 
@@ -175,14 +216,14 @@ export default function PatientDashboard() {
             <h3 className="text-sm font-bold text-slatey-900">{coords ? 'Odontólogos cerca de ti' : 'Odontólogos destacados'}</h3>
             <button onClick={() => { setSelectedDentistId(null); setScreen('marketplace'); }} className="text-xs font-semibold text-primary-600 hover:underline">Ver todos</button>
           </div>
-          {(cercanos.loading || !ubicacionPedida) && <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 text-primary-500 animate-spin" aria-label="Buscando odontólogos" /></div>}
+          {(cercanos.loading || ubicacion === 'cargando') && <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 text-primary-500 animate-spin" aria-label="Buscando odontólogos" /></div>}
           {cercanos.error && (
             <div role="alert" className="rounded-2xl border border-slatey-100 bg-white p-4 text-center space-y-2">
               <p className="text-xs text-slatey-600">{cercanos.error}</p>
               <Button size="sm" onClick={cercanos.reload}>Reintentar</Button>
             </div>
           )}
-          {!cercanos.loading && !cercanos.error && ubicacionPedida && lista.length === 0 && (
+          {!cercanos.loading && !cercanos.error && listoParaBuscar && lista.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slatey-200 bg-white p-5 text-center">
               <p className="text-xs text-slatey-500">{coords ? 'No hay odontólogos verificados en 10 km a tu alrededor.' : 'Aún no hay odontólogos verificados disponibles.'}</p>
             </div>

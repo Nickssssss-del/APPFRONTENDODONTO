@@ -136,7 +136,7 @@ export default function Marketplace() {
   if (!selectedDentistId) {
     const items = lista.data?.contenido ?? [];
     return (
-      <div className="min-h-screen bg-slatey-50 pb-24">
+      <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
         <div className="sticky top-0 z-30 glass border-b border-slatey-100">
           <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
             <div className="flex items-center gap-3">
@@ -199,7 +199,7 @@ export default function Marketplace() {
             >
               <Avatar nombre={d.nombre} url={d.fotoUrl} className="w-16 h-16 rounded-2xl border-2 border-slatey-100 flex-shrink-0" />
               <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold text-slatey-900 font-display">{d.nombre}</h3>
+                <h3 className="break-words text-sm font-bold text-slatey-900 font-display">{d.nombre}</h3>
                 <p className="text-xs text-slatey-500 mt-0.5 truncate">{d.especialidades.join(' · ') || 'Odontología General'}</p>
                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                   {d.calificacion != null && (
@@ -243,7 +243,7 @@ export default function Marketplace() {
 
   if (perfil.loading || perfil.error || !perfil.data) {
     return (
-      <div className="min-h-screen bg-slatey-50 flex flex-col items-center justify-center px-6 text-center gap-4">
+      <div className="flex h-full min-h-0 flex-col items-center justify-center overflow-y-auto bg-slatey-50 px-6 text-center gap-4">
         {perfil.error ? (
           <>
             <AlertCircle className="w-8 h-8 text-error-500" />
@@ -270,7 +270,7 @@ export default function Marketplace() {
     : p.direccion ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${p.direccion}, ${p.distrito ?? ''}`)}` : null;
 
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50 pb-24">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slatey-50">
       <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
         {/* Portada */}
         <div className="relative h-44 overflow-hidden bg-gradient-to-br from-primary-500 to-primary-700">
@@ -360,7 +360,7 @@ export default function Marketplace() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-sm text-slatey-900">{s.titulo}</span>
+                        <span className="min-w-0 break-words font-semibold text-sm text-slatey-900">{s.titulo}</span>
                         <span className="font-bold text-primary-600 text-sm flex-shrink-0">S/ {Number(s.precioTotal).toFixed(2)}</span>
                       </div>
                       <p className="text-xs text-slatey-500 mt-0.5">{s.descripcion || s.categoria} · {s.duracionMinutos} min</p>
@@ -374,7 +374,7 @@ export default function Marketplace() {
       </div>
 
       {/* Hoja de reserva */}
-      <div className="shrink-0 flex flex-col max-h-[42vh] bg-white rounded-t-3xl shadow-2xl shadow-slatey-900/10 border-t border-slatey-100 overflow-hidden">
+      <div className="mb-20 flex max-h-[min(24rem,46dvh)] shrink-0 flex-col overflow-hidden rounded-t-3xl border-t border-slatey-100 bg-white shadow-2xl shadow-slatey-900/10">
         <div className="flex-shrink-0 flex justify-center pt-3 pb-1">
           <div className="w-10 h-1.5 rounded-full bg-slatey-200" aria-hidden="true" />
         </div>

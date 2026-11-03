@@ -54,7 +54,7 @@ export default function PatientProfileScreen() {
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slatey-50">
       <div className="flex-shrink-0 sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
           <button onClick={() => setScreen('patientDashboard')} aria-label="Volver al inicio" className="p-2.5 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors">
@@ -69,7 +69,7 @@ export default function PatientProfileScreen() {
         {avatarError && <p role="alert" className="px-4 pt-2 text-xs font-medium text-error-600 max-w-md mx-auto">{avatarError}</p>}
         <TabBar active={tab} onChange={setTab} />
 
-        <div className="max-w-md mx-auto pb-10">
+        <div className="max-w-md mx-auto pb-28">
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
               {tab === 'resumen' && (

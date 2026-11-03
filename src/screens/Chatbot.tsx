@@ -94,7 +94,7 @@ export default function Chatbot() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-4.5rem)] sm:h-screen bg-slatey-50 max-w-md mx-auto relative overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col bg-slatey-50 max-w-md mx-auto relative overflow-hidden">
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100 bg-white/80 backdrop-blur-md">
         <div className="flex items-center gap-3 px-4 py-3">
@@ -211,7 +211,7 @@ export default function Chatbot() {
       )}
 
       {/* Input Flotante / Inferior */}
-      <div className="bg-white border-t border-slatey-100 px-4 py-3 shrink-0 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="bg-white border-t border-slatey-100 px-4 py-3 shrink-0 pb-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))]">
         <div className="flex items-center gap-2">
           <input
             type="text"

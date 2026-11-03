@@ -162,7 +162,7 @@ export default function CheckoutScreen() {
 
   return (
     <>
-      <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slatey-50">
         {/* ── Top bar ─────────────────────────────────────────────────────────── */}
         <div className="sticky top-0 z-30 glass border-b border-slatey-100 flex-shrink-0">
           <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
