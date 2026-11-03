@@ -66,7 +66,8 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
     }
   };
 
-  if (agenda.loading && !agenda.data) {
+  const nadaListo = !agenda.data && !detalle.data && !historias.data;
+  if (nadaListo && (agenda.loading || detalle.loading || historias.loading)) {
     return (
       <div className="flex flex-col items-center justify-center py-20" aria-busy="true">
         <Loader2 className="w-8 h-8 text-primary-500 animate-spin mb-3" />
@@ -75,7 +76,7 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
     );
   }
 
-  if (agenda.error || detalle.error || (!paciente && !detalle.data && !detalle.loading)) {
+  if ((agenda.error && detalle.error && !historias.data) || (!paciente && !detalle.data && !detalle.loading && !agenda.loading && !historias.data)) {
     return (
       <div className="space-y-4">
         <button onClick={onBack} className="flex items-center gap-2 text-sm text-slatey-500 hover:text-slatey-700 font-medium">

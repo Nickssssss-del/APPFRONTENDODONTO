@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '@/storeHooks';
 import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';
 import { subirFotoPerfil, validarImagen } from '@/api/archivos';
-import { misHistorias, miReputacion } from '@/api/panel';
+import { misHistorias, miReputacion, type Historia } from '@/api/panel';
 import { ProfileHeader } from './ProfileHeader';
 import { TabBar } from './TabBar';
 import { ResumenTab } from './ResumenTab';
@@ -20,15 +20,14 @@ export default function PatientProfileScreen() {
   const [tab, setTab] = useState<ProfileTab>('resumen');
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
-  const historias = useAsync((signal) => misHistorias(signal), []);
+  // Una sola petición al abrir la pestaña. No depende del objeto que devuelve useAsync:
+  // ese objeto cambia en cada render y el efecto anterior relanzaba y abortaba la carga sin parar.
+  const verHistorial = tab === 'historial';
+  const historias = useAsync(
+    (signal) => (verHistorial ? misHistorias(signal) : Promise.resolve([] as Historia[])),
+    [verHistorial],
+  );
   const reputacion = useAsync((signal) => miReputacion(signal), []);
-
-  // Recargar historial cada vez que se abre la pestaña
-  useEffect(() => {
-    if (tab === 'historial') {
-      historias.reload();
-    }
-  }, [tab, historias]);
 
   const ordenadas = useMemo(() => [...citas].sort((a, b) => b.inicio.localeCompare(a.inicio)), [citas]);
 

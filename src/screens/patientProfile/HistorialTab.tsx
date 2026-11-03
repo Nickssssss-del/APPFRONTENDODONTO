@@ -14,9 +14,9 @@ interface Props {
 
 /** Historial clínico real del paciente: GET /api/historias/mias (diagnóstico, tratamiento y notas por cita atendida). */
 export function HistorialTab({ entries, loading, error, onRetry, onReserve }: Props) {
-  if (loading) return <HistorialSkeleton />;
-  if (error) return <ErrorState onRetry={onRetry} />;
-  if (entries.length === 0) return <EmptyState onReserve={onReserve} />;
+  if (loading && entries.length === 0) return <HistorialSkeleton />;
+  if (error && entries.length === 0) return <ErrorState onRetry={onRetry} />;
+  if (!loading && entries.length === 0) return <EmptyState onReserve={onReserve} />;
 
   return (
     <div id="panel-historial" role="tabpanel" aria-labelledby="tab-historial" className="p-4 space-y-4">
