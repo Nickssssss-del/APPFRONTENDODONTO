@@ -30,6 +30,7 @@ type TourContextType = {
 
 const TourContext = createContext<TourContextType | null>(null);
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useTour() {
   const ctx = useContext(TourContext);
   if (!ctx) throw new Error('useTour must be used within TourProvider');

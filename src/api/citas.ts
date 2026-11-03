@@ -27,12 +27,13 @@ export type CitaApi = {
 
 export type PagoApi = {
   pagoId: string;
-  estado: string;
+  estado: 'PENDIENTE' | 'VERIFICADO' | 'RECHAZADO' | 'REEMBOLSADO';
   metodo: MetodoPago;
   monto: number;
   numeroOperacion?: string | null;
   verificadoEn?: string | null;
   simulado: boolean;
+  mensaje?: string | null;
   cita: CitaApi;
 };
 
@@ -40,8 +41,21 @@ export type PagoApi = {
 export const reservarCita = (odontologoId: string, servicioId: string, inicio: string) =>
   api<CitaApi>('/api/citas', { method: 'POST', body: { odontologoId, servicioId, inicio } });
 
-export const pagarDeposito = (citaId: string, metodo: MetodoPago) =>
-  api<PagoApi>(`/api/citas/${citaId}/pagar`, { method: 'POST', body: { metodo } });
+export type PasarelaData = {
+  token: string;
+  medioPagoId?: string;
+};
+
+export const pagarDeposito = (
+  citaId: string,
+  metodo: MetodoPago,
+  pasarela?: PasarelaData
+) => {
+  const body: Record<string, unknown> = { metodo };
+  if (pasarela?.token) body.token = pasarela.token;
+  if (pasarela?.medioPagoId) body.medioPagoId = pasarela.medioPagoId;
+  return api<PagoApi>(`/api/citas/${citaId}/pagar`, { method: 'POST', body });
+};
 
 export const misCitas = () => api<CitaApi[]>('/api/citas/mias');
 export const detalleCita = (id: string) => api<CitaApi>(`/api/citas/${id}`);
