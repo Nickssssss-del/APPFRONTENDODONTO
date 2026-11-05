@@ -108,8 +108,14 @@ export default function Onboarding() {
         setIsRegister(true);
       }
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 404 || err.status === 503)) {
-        setError('El inicio con Google todavía no está disponible. Usa tu correo y contraseña.');
+      if (err instanceof ApiError && err.status === 0) {
+        setError('Sin conexión. Revisa tu internet e inténtalo de nuevo.');
+      } else if (err instanceof ApiError && err.status === 503) {
+        setError('El inicio con Google no está disponible en el servidor. Usa tu correo y contraseña.');
+      } else if (err instanceof ApiError && err.status === 401) {
+        setError(err.message || 'Google no aceptó la credencial. Vuelve a intentarlo.');
+      } else if (err instanceof ApiError && err.status === 404) {
+        setError('El servidor no expone el inicio con Google. Usa tu correo y contraseña.');
       } else {
         setError(err instanceof ApiError ? err.message : 'No se pudo iniciar sesión con Google.');
       }

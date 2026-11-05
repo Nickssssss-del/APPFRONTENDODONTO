@@ -42,25 +42,29 @@ export function HistorialSkeleton() {
 }
 
 /** Empty state for new patients with zero history */
-export function EmptyState({ onReserve }: { onReserve: () => void }) {
+export function EmptyState({ attendedAppointments = 0, onReserve }: { attendedAppointments?: number; onReserve: () => void }) {
+  const hasAttendedAppointments = attendedAppointments > 0;
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
       <div className="w-20 h-20 rounded-full bg-primary-50 flex items-center justify-center mb-5">
         <Stethoscope className="h-9 w-9 text-primary-600" aria-hidden="true" />
       </div>
       <h3 className="text-lg font-bold text-slatey-900 font-display mb-2">
-        ¡Aún no tienes historial!
+        {hasAttendedAppointments ? 'No hay historias clínicas registradas' : '¡Aún no tienes historial!'}
       </h3>
       <p className="text-sm text-slatey-500 max-w-xs leading-relaxed mb-6">
-        Cuando reserves tu primera cita y el odontólogo te atienda, aquí verás
-        tu historia clínica completa.
+        {hasAttendedAppointments
+          ? `Tienes ${attendedAppointments} ${attendedAppointments === 1 ? 'cita atendida' : 'citas atendidas'}, pero el odontólogo todavía no ha registrado una historia clínica.`
+          : 'Cuando reserves tu primera cita y el odontólogo te atienda, aquí verás tu historia clínica completa.'}
       </p>
-      <button
-        onClick={onReserve}
-        className="inline-flex items-center gap-2 bg-primary-500 text-white font-bold text-sm px-6 py-3 rounded-2xl shadow-sm shadow-primary-500/30 hover:bg-primary-600 transition-colors"
-      >
-        Reservar mi primera cita
-      </button>
+      {!hasAttendedAppointments && (
+        <button
+          onClick={onReserve}
+          className="inline-flex items-center gap-2 bg-primary-500 text-white font-bold text-sm px-6 py-3 rounded-2xl shadow-sm shadow-primary-500/30 hover:bg-primary-600 transition-colors"
+        >
+          Reservar mi primera cita
+        </button>
+      )}
     </div>
   );
 }
@@ -85,4 +89,3 @@ export function ErrorState({ onRetry }: { onRetry: () => void }) {
     </div>
   );
 }
-

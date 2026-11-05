@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useApp } from '@/storeHooks';
 import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';
 import { subirFotoPerfil, validarImagen } from '@/api/archivos';
-import { misHistorias, miReputacion } from '@/api/panel';
+import { misHistorias, miReputacion, type Historia } from '@/api/panel';
 import { ProfileHeader } from './ProfileHeader';
 import { TabBar } from './TabBar';
 import { ResumenTab } from './ResumenTab';
@@ -20,15 +20,14 @@ export default function PatientProfileScreen() {
   const [tab, setTab] = useState<ProfileTab>('resumen');
   const [avatarError, setAvatarError] = useState<string | null>(null);
 
-  const historias = useAsync((signal) => misHistorias(signal), []);
+  // Una sola petición al abrir la pestaña. No depende del objeto que devuelve useAsync:
+  // ese objeto cambia en cada render y el efecto anterior relanzaba y abortaba la carga sin parar.
+  const verHistorial = tab === 'historial';
+  const historias = useAsync(
+    (signal) => (verHistorial ? misHistorias(signal) : Promise.resolve([] as Historia[])),
+    [verHistorial],
+  );
   const reputacion = useAsync((signal) => miReputacion(signal), []);
-
-  // Recargar historial cada vez que se abre la pestaña
-  useEffect(() => {
-    if (tab === 'historial') {
-      historias.reload();
-    }
-  }, [tab, historias]);
 
   const ordenadas = useMemo(() => [...citas].sort((a, b) => b.inicio.localeCompare(a.inicio)), [citas]);
 
@@ -55,7 +54,7 @@ export default function PatientProfileScreen() {
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slatey-50">
       <div className="flex-shrink-0 sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
           <button onClick={() => setScreen('patientDashboard')} aria-label="Volver al inicio" className="p-2.5 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors">
@@ -70,7 +69,7 @@ export default function PatientProfileScreen() {
         {avatarError && <p role="alert" className="px-4 pt-2 text-xs font-medium text-error-600 max-w-md mx-auto">{avatarError}</p>}
         <TabBar active={tab} onChange={setTab} />
 
-        <div className="max-w-md mx-auto pb-10">
+        <div className="max-w-md mx-auto pb-28">
           <AnimatePresence mode="wait">
             <motion.div key={tab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18 }}>
               {tab === 'resumen' && (
@@ -88,7 +87,14 @@ export default function PatientProfileScreen() {
                 </>
               )}
               {tab === 'historial' && (
-                <HistorialTab entries={historias.data ?? []} loading={historias.loading} error={historias.error} onRetry={historias.reload} onReserve={() => setScreen('marketplace')} />
+                <HistorialTab
+                  entries={historias.data ?? []}
+                  attendedAppointments={citas.filter((c) => c.estado === 'COMPLETADA').length}
+                  loading={historias.loading}
+                  error={historias.error}
+                  onRetry={historias.reload}
+                  onReserve={() => setScreen('marketplace')}
+                />
               )}
               {tab === 'comprobantes' && <ComprobantesTab citas={ordenadas} onReserve={() => setScreen('marketplace')} />}
               {tab === 'reclamos' && (

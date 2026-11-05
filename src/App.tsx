@@ -159,6 +159,7 @@ const SHOW_DIAGNOSTICO = import.meta.env.DEV && typeof window !== 'undefined' &&
 function AppContent() {
   const { screen, setScreen, isAuth, role, sessionLoading, perfilListo } = useApp();
   const isPatientScreen = PATIENT_SCREENS.has(screen);
+  const showPatientBottomNav = isPatientScreen && screen !== 'checkout';
 
   // Sesión restaurada con el refresh token (o login/registro): salta splash, tutorial y login y entra directo
   // al panel que corresponde al rol REAL que devolvió el servidor. Espera a /api/usuarios/yo: antes de eso
@@ -190,18 +191,18 @@ function AppContent() {
 
   return (
     <TourProvider>
-      <div className="min-h-screen bg-slatey-100">
+      <div className="h-full bg-slatey-100">
         {/* Mobile app container - full width, no sidebar */}
-        <div className="w-full max-w-md mx-auto min-h-screen bg-slatey-50 relative shadow-xl">
+        <div className="flex h-full w-full max-w-md mx-auto flex-col bg-slatey-50 relative shadow-xl">
           <ErrorBoundary>
             <AnimatePresence mode="wait">
               <motion.div
                 key={screen}
-                initial={{ opacity: 0, x: 30, rotateY: 8 }}
-                animate={{ opacity: 1, x: 0, rotateY: 0 }}
-                exit={{ opacity: 0, x: -30, rotateY: -8 }}
-                transition={{ duration: 0.35, ease: [0.4, 0, 0.2, 1] }}
-                style={{ perspective: 1000 }}
+                className={isPatientScreen ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-full'}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
               >
                 {screen === 'splash' && <SplashScreen />}
                 {screen === 'tutorial' && <WelcomeTutorial />}
@@ -222,7 +223,7 @@ function AppContent() {
           </ErrorBoundary>
 
           <SettingsModal />
-          {isPatientScreen && <PatientBottomNav />}
+          {showPatientBottomNav && <PatientBottomNav />}
 
           <TourTrigger config={patientTourConfig} triggerScreen="patientDashboard" />
           <TourTrigger config={dentistTourConfig} triggerScreen="dentistPanel" />

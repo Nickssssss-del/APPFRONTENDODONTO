@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, AppointmentRequest, DayLabel } from './types';
-import { restoreSession, logout as apiLogout } from './api/auth';
+import { Capacitor } from '@capacitor/core';
+import { GoogleSignIn } from '@capawesome/capacitor-google-sign-in';
+import { restoreSession, logout as apiLogout, loginConGoogle } from './api/auth';
 import { SESSION_EXPIRED_EVENT } from './api/http';
 import { obtenerYo } from './api/usuarios';
 import { activarPush, desactivarPush } from './lib/push';
@@ -157,6 +159,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // Quita el token push de este celular. La petición sale con el access token actual (se lee al instante,
     // antes de que apiLogout lo borre); si falla da igual: el backend descarta tokens inválidos.
     void desactivarPush();
+    if (Capacitor.getPlatform() === 'android') {
+      void GoogleSignIn.signOut().catch(() => undefined);
+    }
     apiLogout(); // borra access (memoria) y refresh (localStorage)
     isAuthRef.current = false;
     setIsAuth(false);
@@ -367,9 +372,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setHoldSeconds(600);
   };
 
-  // Firma heredada: el login con Google real vive en api/auth.ts (POST /api/auth/google) y lo usa GoogleButton.
-  const loginWithGoogle = async (_idToken: string): Promise<void> => {
-    throw new Error('El inicio de sesión con Google aún no está disponible. Usa tu correo y contraseña.');
+  // Misma sesión que Onboarding: POST /api/auth/google, JWT propio y panel según el rol del servidor.
+  // Si el perfil está incompleto, no abre sesión: el alta sigue en Onboarding (registroConGoogle).
+  const loginWithGoogle = async (idToken: string): Promise<void> => {
+    const r = await loginConGoogle(idToken);
+    if (r.estado !== 'sesion') {
+      throw new Error('Esta cuenta de Google todavía no tiene perfil. Completa el registro en la pantalla de inicio.');
+    }
+    const realRole = r.sesion.rol === 'ODONTOLOGO' ? 'dentist' : 'patient';
+    setRole(realRole);
+    setUser({ fullName: r.sesion.nombreCompleto, email: '', phone: '', dni: '', age: '' });
+    setIsAuth(true);
+    setScreen(realRole === 'patient' ? 'patientDashboard' : 'dentistPanel');
   };
 
   return (

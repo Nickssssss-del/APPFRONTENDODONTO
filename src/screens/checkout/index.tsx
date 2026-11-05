@@ -248,7 +248,7 @@ export default function CheckoutScreen() {
 
   return (
     <>
-      <div className="h-[100dvh] flex flex-col overflow-hidden bg-slatey-50">
+      <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slatey-50">
         {/* ── Top bar ─────────────────────────────────────────────────────────── */}
         <div className="sticky top-0 z-30 glass border-b border-slatey-100 flex-shrink-0">
           <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
@@ -269,8 +269,8 @@ export default function CheckoutScreen() {
         </div>
 
         {/* ── Scrollable content ───────────────────────────────────────────────── */}
-        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide">
-          <div className="max-w-md mx-auto px-4 py-5 space-y-4 pb-32">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide">
+          <div className="mx-auto max-w-md space-y-4 px-4 py-5 pb-6">
             {/* Appointment summary (collapsible) */}
             <AppointmentSummary
               treatment={selectedTreatment}
@@ -351,7 +351,7 @@ export default function CheckoutScreen() {
         </div>
 
         {/* ── Sticky CTA bar ───────────────────────────────────────────────────── */}
-        <div className="flex-shrink-0 border-t border-slatey-100 bg-white/95 backdrop-blur-sm px-4 py-4 safe-area-bottom">
+        <div className="flex-shrink-0 border-t border-slatey-100 bg-white/95 px-4 py-3 backdrop-blur-sm safe-area-bottom">
           <div className="max-w-md mx-auto">
             {payState === 'rejected' && (
               <p className="text-xs text-error-600 font-semibold text-center mb-2" role="alert">
@@ -436,4 +436,3 @@ export default function CheckoutScreen() {
     </>
   );
 }
-

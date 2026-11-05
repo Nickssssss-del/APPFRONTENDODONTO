@@ -5,7 +5,7 @@ import { Badge, Button } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { ApiError } from '@/api/http';
 import { agendaOdontologo, type CitaApi } from '@/api/citas';
-import { historiasEscritasPara, registrarHistoria } from '@/api/panel';
+import { detallePaciente, historiasEscritasPara, registrarHistoria, type Historia } from '@/api/panel';
 import { agruparPacientes, iniciales } from '@/lib/pacientes';
 import { diaLima, fechaIsoLima, horaLima, sumarDias } from '@/lib/format';
 
@@ -22,10 +22,15 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
   const hoy = useMemo(() => fechaIsoLima(new Date()), []);
   const agenda = useAsync(() => agendaOdontologo(sumarDias(hoy, -DIAS_ATRAS), sumarDias(hoy, DIAS_ADELANTE)), [hoy]);
   const historias = useAsync((signal) => historiasEscritasPara(patientId, signal), [patientId]);
+  const detalle = useAsync((signal) => detallePaciente(patientId, signal), [patientId]);
 
-  const paciente = useMemo(() => agruparPacientes(agenda.data ?? []).find((p) => p.id === patientId), [agenda.data, patientId]);
+  const pacienteAgenda = useMemo(() => agruparPacientes(agenda.data ?? []).find((p) => p.id === patientId), [agenda.data, patientId]);
+  const nombrePaciente = detalle.data
+    ? `${detalle.data.nombre} ${detalle.data.apellido}`.trim()
+    : pacienteAgenda?.nombre ?? '';
+  const paciente = pacienteAgenda;
   const citasPaciente = paciente?.citas ?? [];
-  const listaHistorias = useMemo(() => historias.data ?? [], [historias.data]);
+  const listaHistorias = useMemo<Historia[]>(() => historias.data ?? [], [historias.data]);
   const conHistoria = useMemo(() => new Set(listaHistorias.map((h) => h.citaId)), [listaHistorias]);
   // Una historia solo se escribe una vez por cita y solo cuando la cita ya fue atendida.
   const pendientesDeHistoria = citasPaciente.filter((c) => c.estado === 'COMPLETADA' && !conHistoria.has(c.id));
@@ -61,7 +66,8 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
     }
   };
 
-  if (agenda.loading && !agenda.data) {
+  const nadaListo = !agenda.data && !detalle.data && !historias.data;
+  if (nadaListo && (agenda.loading || detalle.loading || historias.loading)) {
     return (
       <div className="flex flex-col items-center justify-center py-20" aria-busy="true">
         <Loader2 className="w-8 h-8 text-primary-500 animate-spin mb-3" />
@@ -70,7 +76,7 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
     );
   }
 
-  if (agenda.error || !paciente) {
+  if ((agenda.error && detalle.error && !historias.data) || (!paciente && !detalle.data && !detalle.loading && !agenda.loading && !historias.data)) {
     return (
       <div className="space-y-4">
         <button onClick={onBack} className="flex items-center gap-2 text-sm text-slatey-500 hover:text-slatey-700 font-medium">
@@ -78,8 +84,8 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
         </button>
         <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-slatey-100 bg-white p-8 text-center">
           <AlertCircle className="w-7 h-7 text-accent-600" />
-          <p className="text-sm text-slatey-600">{agenda.error ?? 'No encontramos a este paciente en tus citas recientes.'}</p>
-          {agenda.error && <Button size="sm" onClick={agenda.reload}>Reintentar</Button>}
+          <p className="text-sm text-slatey-600">{agenda.error ?? detalle.error ?? 'No encontramos a este paciente.'}</p>
+          {(agenda.error || detalle.error) && <Button size="sm" onClick={() => { agenda.reload(); detalle.reload(); }}>Reintentar</Button>}
         </div>
       </div>
     );
@@ -94,38 +100,37 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-5 border border-slatey-100">
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center text-xl font-bold flex-shrink-0" aria-hidden="true">
-            {iniciales(paciente.nombre)}
+            {iniciales(nombrePaciente)}
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-slatey-900 font-display">{paciente.nombre}</h2>
+            <h2 className="text-lg font-bold text-slatey-900 font-display">{nombrePaciente}</h2>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <Badge variant="primary" size="sm"><CheckCircle2 className="w-3 h-3" /> {paciente.visitas} {paciente.visitas === 1 ? 'visita' : 'visitas'}</Badge>
-              {paciente.ultimaCita && <Badge variant="neutral" size="sm">Última: {diaLima(paciente.ultimaCita)}</Badge>}
+              <Badge variant="primary" size="sm"><CheckCircle2 className="w-3 h-3" /> {paciente?.visitas ?? 0} {(paciente?.visitas ?? 0) === 1 ? 'visita' : 'visitas'}</Badge>
+              {paciente?.ultimaCita && <Badge variant="neutral" size="sm">Última: {diaLima(paciente.ultimaCita)}</Badge>}
             </div>
           </div>
         </div>
         <div className="space-y-2 mt-4">
-          {paciente.telefono && (
+          {paciente?.telefono && (
             <a href={`tel:${paciente.telefono.replace(/\s/g, '')}`} className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm font-semibold text-slatey-900">
               <Phone className="w-4 h-4 text-slatey-400" /> {paciente.telefono}
             </a>
           )}
-          {paciente.correo && (
+          {paciente?.correo && (
             <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm font-semibold text-slatey-900 min-w-0">
               <Mail className="w-4 h-4 text-slatey-400 flex-shrink-0" /> <span className="truncate">{paciente.correo}</span>
             </div>
           )}
-          {/* Alergias y Antecedentes (datos no disponibles en agenda, se muestran placeholders) */}
           <div className="space-y-2 pt-2 border-t border-slatey-100">
             <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-900">
               <AlertCircle className="w-4 h-4 text-slatey-400 flex-shrink-0" />
               <span className="font-semibold">Alergias:</span>
-              <span className="text-slatey-500 ml-2">Ninguna registrada</span>
+              <span className="text-slatey-500 ml-2">{detalle.data?.alergias || 'No disponible'}</span>
             </div>
             <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-900">
               <FileText className="w-4 h-4 text-slatey-400 flex-shrink-0" />
               <span className="font-semibold">Antecedentes:</span>
-              <span className="text-slatey-500 ml-2">Sin antecedentes registrados</span>
+              <span className="text-slatey-500 ml-2">{detalle.data?.antecedentes || 'No disponible'}</span>
             </div>
           </div>
         </div>

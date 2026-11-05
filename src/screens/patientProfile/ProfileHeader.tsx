@@ -10,6 +10,15 @@ interface Props {
   onAvatarChange: (file: File) => void;
 }
 
+function VerifiedBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2 py-1 text-[11px] font-semibold text-success-700">
+      {icon}
+      {label}
+    </span>
+  );
+}
+
 /** Masks DNI: shows only last 3 digits — e.g. "12345678" → "·····678" */
 function maskDni(dni: string): string {
   if (!dni || dni.length < 3) return '—';
@@ -105,4 +114,3 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
     </div>
   );
 }
-

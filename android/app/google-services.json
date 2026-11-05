@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "558289572863",
+    "project_id": "odontosystem-512004",
+    "storage_bucket": "odontosystem-512004.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:558289572863:android:1e6974c1df876bfbab0dca",
+        "android_client_info": {
+          "package_name": "com.odontosystem.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "558289572863-5b08usne6u4s6cvhlbkv72tp5ah36msh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDOz8l67xj1T0ze3Z3GyvwRvJxEcPYeQvk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "558289572863-5b08usne6u4s6cvhlbkv72tp5ah36msh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

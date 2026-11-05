@@ -88,6 +88,8 @@ export type Liquidacion = {
   monto: number;
   estado: string;
   retenidaPor?: string | null;
+  motivo?: string | null;
+  detalle?: string | null;
   pagarDesde?: string | null;
   referenciaPago?: string | null;
   liquidadoEn?: string | null;
@@ -96,6 +98,32 @@ export type MisIngresos = { enCustodia: number; pagado: number; devueltoAPacient
 export const misIngresos = (signal?: AbortSignal) => api<MisIngresos>('/api/odontologos/yo/liquidaciones', { signal });
 /** Las mismas liquidaciones en Excel (.xlsx). */
 export const descargarLiquidacionesExcel = () => apiBlob('/api/odontologos/yo/liquidaciones/excel');
+
+export type PacienteResumen = {
+  id: string;
+  nombreCompleto: string;
+  correo?: string | null;
+  telefono?: string | null;
+  totalCitas: number;
+  citasAtendidas: number;
+  inasistencias: number;
+  ultimaAtencion?: string | null;
+  proximaCita?: string | null;
+};
+
+export type PacienteDetalle = {
+  id: string;
+  nombre: string;
+  apellido: string;
+  alergias?: string | null;
+  antecedentes?: string | null;
+};
+
+export const misPacientes = (signal?: AbortSignal) =>
+  api<PacienteResumen[]>('/api/odontologos/yo/pacientes', { signal });
+
+export const detallePaciente = (pacienteId: string, signal?: AbortSignal) =>
+  api<PacienteDetalle>(`/api/pacientes/${pacienteId}`, { signal });
 
 /* ───────── Historias clínicas ───────── */
 export type Historia = {

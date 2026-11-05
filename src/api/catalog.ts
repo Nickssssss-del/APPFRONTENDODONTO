@@ -22,6 +22,8 @@ export type OdontologoTarjeta = {
   precioDesde?: number | null;
   /** Solo viene cuando buscas "cerca de mí" (lat/lng). */
   distanciaKm?: number | null;
+  latitud?: number | null;
+  longitud?: number | null;
 };
 
 export type Pagina<T> = { contenido: T[]; pagina: number; tamano: number; totalElementos: number; totalPaginas: number };
@@ -111,8 +113,8 @@ export function toDentistLocation(o: OdontologoTarjeta): DentistLocation {
     cop: '',
     address: o.consultorio ?? '',
     district: o.distrito ?? undefined,
-    lat: 0,
-    lng: 0,
+    lat: o.latitud ?? 0,
+    lng: o.longitud ?? 0,
     image: o.fotoUrl ?? '',
     price: Number(o.precioDesde ?? 0),
   };
