@@ -32,7 +32,7 @@ export default function PatientProfileScreen() {
   const ordenadas = useMemo(() => [...citas].sort((a, b) => b.inicio.localeCompare(a.inicio)), [citas]);
 
   const handleAvatarChange = async (file: File) => {
-    const err = validarImagen(file);
+    const err = await validarImagen(file);
     if (err) return setAvatarError(err);
     try {
       const r = await subirFotoPerfil(file);

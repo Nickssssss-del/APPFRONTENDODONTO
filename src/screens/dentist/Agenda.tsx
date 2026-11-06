@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock, AlertCircle, ChevronDown, ChevronUp, ShieldCheck, Phone, Mail, MessageCircle, Loader2, CheckCircle2, XCircle, FileText,
@@ -9,7 +9,7 @@ import {
   agendaOdontologo, confirmarCita, completarCita, marcarInasistencia, type CitaApi, type EstadoCita,
 } from '@/api/citas';
 import { ApiError } from '@/api/http';
-import { proximosDias, sumarDias, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
+import { diasAgendaOdontologo, sumarDias, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
 
 type Variante = 'success' | 'primary' | 'warning' | 'error' | 'neutral';
 const statusConfig: Record<EstadoCita, { variant: Variante; dot: string }> = {
@@ -23,7 +23,6 @@ const statusConfig: Record<EstadoCita, { variant: Variante; dot: string }> = {
   REPROGRAMADA: { variant: 'primary', dot: 'bg-primary-500' },
 };
 
-const DIAS_AGENDA = 14;
 
 type AgendaProps = {
   /** Abre la historia clínica del paciente (id = paciente.id del backend). */
@@ -33,8 +32,10 @@ type AgendaProps = {
 const iniciales = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'PA';
 
 export default function Agenda({ onGoToPatient }: AgendaProps) {
-  const dias = useMemo(() => proximosDias(DIAS_AGENDA), []);
-  const [selectedDateIdx, setSelectedDateIdx] = useState(0);
+  const dias = useMemo(() => diasAgendaOdontologo(), []);
+  const [selectedDateIdx, setSelectedDateIdx] = useState(() => Math.max(0, dias.findIndex((d) => d.fecha === fechaIsoLima(new Date()))));
+  const diaActivo = useRef<HTMLButtonElement>(null);
+  useEffect(() => { diaActivo.current?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, []);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [accionEn, setAccionEn] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
@@ -73,6 +74,7 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
           return (
             <button
               key={d.fecha}
+              ref={active ? diaActivo : undefined}
               onClick={() => setSelectedDateIdx(i)}
               className={`flex-shrink-0 flex flex-col items-center gap-0.5 px-4 py-3 rounded-2xl border-2 transition-all min-w-[64px] ${
                 active

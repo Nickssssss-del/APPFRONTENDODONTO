@@ -26,10 +26,10 @@ export default function DentistPanel() {
 
   const handleGoToPatient = (id: string) => {
     setSelectedPatientId(id);
-    setDentistTab('history');
   };
 
-  const showPatientDetail = dentistTab === 'history' && selectedPatientId !== null;
+  const cerrarFicha = () => setSelectedPatientId(null);
+  const showPatientDetail = selectedPatientId !== null;
 
   return (
     <div className="min-h-screen bg-slatey-50 pb-24">
@@ -68,11 +68,9 @@ export default function DentistPanel() {
               transition={{ duration: 0.3 }}
             >
               <PatientDetail
+                key={selectedPatientId ?? ''}
                 patientId={selectedPatientId ?? ''}
-                onBack={() => {
-                  setSelectedPatientId(null);
-                  setDentistTab('agenda');
-                }}
+                onBack={cerrarFicha}
               />
             </motion.div>
           ) : (
@@ -96,16 +94,15 @@ export default function DentistPanel() {
       </div>
 
       {/* Bottom Navigation */}
-      {!showPatientDetail && (
-        <div className="fixed bottom-0 left-0 right-0 z-30">
+      <div className="fixed bottom-0 left-0 right-0 z-30">
           <nav aria-label="Secciones del consultorio" className="max-w-md mx-auto bg-white border-t border-slatey-100 px-2 py-2 flex justify-around items-center">
             {TABS.map((tab) => {
               const Icon = tab.icon;
-              const active = dentistTab === tab.id;
+              const active = !showPatientDetail && dentistTab === tab.id;
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setDentistTab(tab.id)}
+                  onClick={() => { cerrarFicha(); setDentistTab(tab.id); }}
                   aria-current={active ? 'page' : undefined}
                   className="relative flex min-h-[44px] min-w-[44px] flex-col items-center gap-1 px-2 py-2 transition-colors"
                 >
@@ -124,8 +121,7 @@ export default function DentistPanel() {
               );
             })}
           </nav>
-        </div>
-      )}
+      </div>
       {/* Acceso al chatbot */}
       <button
         onClick={() => setScreen('chatbot')}

@@ -66,6 +66,32 @@ export function sumarDias(fecha: string, dias: number): string {
   return `${r.getUTCFullYear()}-${dos(r.getUTCMonth() + 1)}-${dos(r.getUTCDate())}`;
 }
 
+/**
+ * Ventana única de la agenda del odontólogo y de la ficha del paciente.
+ * Inicio: un día atrás (la alternativa «mañana» dejaría fuera la cita de hoy).
+ * Fin: 62 días después de hoy, inclusive. `hasta` del backend es exclusivo.
+ */
+export const AGENDA_DIAS_ANTES = 1;
+export const AGENDA_DIAS_DESPUES = 62;
+
+export function rangoAgendaOdontologo(ahora = new Date()) {
+  const hoy = fechaIsoLima(ahora);
+  const desde = sumarDias(hoy, -AGENDA_DIAS_ANTES);
+  const ultimo = sumarDias(hoy, AGENDA_DIAS_DESPUES);
+  return { hoy, desde, ultimo, hastaExclusivo: sumarDias(ultimo, 1) };
+}
+
+export function diasAgendaOdontologo(ahora = new Date()) {
+  const { desde, ultimo } = rangoAgendaOdontologo(ahora);
+  const dias: { fecha: string; etiqueta: string; corto: string; numero: number }[] = [];
+  for (let fecha = desde; fecha <= ultimo; fecha = sumarDias(fecha, 1)) {
+    const [y, m, d] = fecha.split('-').map(Number);
+    const etiqueta = diaLima(new Date(Date.UTC(y, m - 1, d, 12)));
+    dias.push({ fecha, etiqueta, corto: etiqueta.split(' ')[0], numero: d });
+  }
+  return dias;
+}
+
 export const soles = (n: number | null | undefined) => `S/ ${Number(n ?? 0).toFixed(2)}`;
 
 /** Segundos que faltan hasta `iso` (0 si ya pasó). */

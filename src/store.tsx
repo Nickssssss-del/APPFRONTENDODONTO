@@ -3,6 +3,7 @@ import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, App
 import { Capacitor } from '@capacitor/core';
 import { GoogleSignIn } from '@capawesome/capacitor-google-sign-in';
 import { restoreSession, logout as apiLogout, loginConGoogle } from './api/auth';
+import { pantallaVisible } from './lib/acceso';
 import { SESSION_EXPIRED_EVENT } from './api/http';
 import { obtenerYo } from './api/usuarios';
 import { activarPush, desactivarPush } from './lib/push';
@@ -152,8 +153,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Refs para que los callbacks estables vean siempre el rol y la sesión actuales.
   const isAuthRef = useRef(false);
   const roleRef = useRef<Role>('patient');
+  const perfilListoRef = useRef(false);
+  const sessionLoadingRef = useRef(true);
   isAuthRef.current = isAuth;
   roleRef.current = role;
+  perfilListoRef.current = perfilListo;
+  sessionLoadingRef.current = sessionLoading;
 
   const logout = useCallback(() => {
     // Quita el token push de este celular. La petición sale con el access token actual (se lee al instante,
@@ -181,8 +186,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Cualquier salto a "onboarding" con sesión abierta (p. ej. "Cerrar sesión" en Ajustes) cierra la sesión de verdad.
   const setScreen = useCallback((s: Screen) => {
-    if (s === 'onboarding' && isAuthRef.current) logout();
-    setScreenRaw(s);
+    if (s === 'onboarding' && isAuthRef.current) {
+      logout();
+      setScreenRaw('onboarding');
+      return;
+    }
+    // Sin sesión confirmada no se reescribe el destino: el login aún no actualizó el rol.
+    // App.tsx evita pintar la pantalla si, ya con el rol, no corresponde.
+    if (!isAuthRef.current || !perfilListoRef.current || sessionLoadingRef.current) {
+      setScreenRaw(s);
+      return;
+    }
+    setScreenRaw(pantallaVisible(s, {
+      sessionLoading: false,
+      isAuth: true,
+      perfilListo: true,
+      role: roleRef.current,
+    }));
   }, [logout]);
 
    const refreshAppointments = useCallback(async () => {

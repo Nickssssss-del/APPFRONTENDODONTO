@@ -2,6 +2,7 @@ import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { Component, ErrorInfo, ReactNode, useEffect } from 'react';
 import { AppProvider } from './store';
 import { useApp } from './storeHooks';
+import { pantallaVisible } from './lib/acceso';
 import SplashScreen from './screens/SplashScreen';
 import WelcomeTutorial from './screens/WelcomeTutorial';
 import Onboarding from './screens/Onboarding';
@@ -150,34 +151,19 @@ const dentistTourConfig: TourConfig = {
   ],
 };
 
-/** Pantallas previas al login: con una sesión válida no deben mostrarse. */
-const PRE_AUTH_SCREENS = new Set<Screen>(['splash', 'tutorial', 'onboarding']);
-
 /** Abre el diagnóstico de conexión con el backend: http://localhost:5173/?diagnostico=1 */
 const SHOW_DIAGNOSTICO = import.meta.env.DEV && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('diagnostico');
 
 function AppContent() {
   const { screen, setScreen, isAuth, role, sessionLoading, perfilListo } = useApp();
-  const isPatientScreen = PATIENT_SCREENS.has(screen);
-  const showPatientBottomNav = isPatientScreen && screen !== 'checkout';
+  const visible = pantallaVisible(screen, { sessionLoading, isAuth, perfilListo, role });
+  const isPatientScreen = PATIENT_SCREENS.has(visible);
+  const showPatientBottomNav = isPatientScreen && visible !== 'checkout';
 
-  // Sesión restaurada con el refresh token (o login/registro): salta splash, tutorial y login y entra directo
-  // al panel que corresponde al rol REAL que devolvió el servidor. Espera a /api/usuarios/yo: antes de eso
-  // el rol es el valor por defecto ('patient') y un odontólogo terminaba en el panel del paciente.
+  // Alinea el estado con la pantalla permitida. No corre mientras el rol todavía es el valor por defecto.
   useEffect(() => {
-    if (sessionLoading || !isAuth || !perfilListo) return;
-    if (PRE_AUTH_SCREENS.has(screen)) {
-      setScreen(role === 'dentist' ? 'dentistPanel' : 'patientDashboard');
-    }
-  }, [sessionLoading, isAuth, perfilListo, role, screen, setScreen]);
-
-  // Protección de rutas: sin sesión no se entra a pantallas de paciente ni al panel del odontólogo.
-  // (El marketplace es público en el backend, así que se deja abierto para explorar antes de registrarse.)
-  useEffect(() => {
-    if (sessionLoading || isAuth) return;
-    const PROTEGIDAS = new Set<Screen>(['misCitas', 'notificaciones', 'checkout', 'confirmarCita', 'patientProfile', 'dentistPanel', 'dentistProfile', 'patientDashboard']);
-    if (PROTEGIDAS.has(screen)) setScreen('onboarding');
-  }, [sessionLoading, isAuth, screen, setScreen]);
+    if (visible !== screen) setScreen(visible);
+  }, [visible, screen, setScreen]);
 
   if (SHOW_DIAGNOSTICO) {
     return (
@@ -197,27 +183,27 @@ function AppContent() {
           <ErrorBoundary>
             <AnimatePresence mode="wait">
               <motion.div
-                key={screen}
+                key={visible}
                 className={isPatientScreen ? 'min-h-0 flex-1 overflow-hidden' : 'min-h-full'}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
               >
-                {screen === 'splash' && <SplashScreen />}
-                {screen === 'tutorial' && <WelcomeTutorial />}
-                {screen === 'onboarding' && <Onboarding />}
-                {screen === 'marketplace' && <Marketplace />}
-                {screen === 'checkout' && <Checkout />}
-                {screen === 'patientDashboard' && <PatientDashboard />}
-                {screen === 'misCitas' && <PatientAppointments />}
-                {screen === 'notificaciones' && <PatientNotifications />}
-                {screen === 'dentistPanel' && <DentistPanel />}
-                {screen === 'chatbot' && <Chatbot />}
-                {screen === 'dentistProfile' && <DentistProfile />}
-                {screen === 'patientProfile' && <PatientProfile />}
-                {screen === 'confirmarCita' && <ConfirmarCita />}
-                {screen === 'apelacion' && <ApelacionScreen />}
+                {visible === 'splash' && <SplashScreen />}
+                {visible === 'tutorial' && <WelcomeTutorial />}
+                {visible === 'onboarding' && <Onboarding />}
+                {visible === 'marketplace' && <Marketplace />}
+                {visible === 'checkout' && <Checkout />}
+                {visible === 'patientDashboard' && <PatientDashboard />}
+                {visible === 'misCitas' && <PatientAppointments />}
+                {visible === 'notificaciones' && <PatientNotifications />}
+                {visible === 'dentistPanel' && <DentistPanel />}
+                {visible === 'chatbot' && <Chatbot />}
+                {visible === 'dentistProfile' && <DentistProfile />}
+                {visible === 'patientProfile' && <PatientProfile />}
+                {visible === 'confirmarCita' && <ConfirmarCita />}
+                {visible === 'apelacion' && <ApelacionScreen />}
               </motion.div>
             </AnimatePresence>
           </ErrorBoundary>

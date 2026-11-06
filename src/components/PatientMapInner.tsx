@@ -7,6 +7,7 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import type { EstadoUbicacion, PinOdontologo } from './PatientMap';
 
+import { coordenadaValida } from '@/utils/coordenada';
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: never })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -20,13 +21,6 @@ const iconoPaciente = L.divIcon({
   iconSize: [16, 16],
   iconAnchor: [8, 8],
 });
-
-export function coordenadaValida(lat?: number | null, lng?: number | null): boolean {
-  return typeof lat === 'number' && typeof lng === 'number'
-    && Number.isFinite(lat) && Number.isFinite(lng)
-    && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
-    && !(lat === 0 && lng === 0);
-}
 
 function distanciaKm(a: { lat: number; lng: number }, lat: number, lng: number): number {
   const r = 6371;

@@ -3,14 +3,12 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, FileText, CheckCircle2, Plus, Loader2, AlertCircle, Phone, Mail, Stethoscope, Pill, ClipboardList } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
+import { useCitasAntiguas } from '@/hooks/useCitasAntiguas';
 import { ApiError } from '@/api/http';
 import { agendaOdontologo, type CitaApi } from '@/api/citas';
 import { detallePaciente, historiasEscritasPara, registrarHistoria, type Historia } from '@/api/panel';
 import { agruparPacientes, iniciales } from '@/lib/pacientes';
-import { diaLima, fechaIsoLima, horaLima, sumarDias } from '@/lib/format';
-
-const DIAS_ATRAS = 0;
-const DIAS_ADELANTE = 30;
+import { AGENDA_DIAS_ANTES, AGENDA_DIAS_DESPUES, diaLima, horaLima, rangoAgendaOdontologo } from '@/lib/format';
 
 type PatientDetailProps = {
   /** id del paciente (usuario) tal como lo devuelve el backend en cita.paciente.id */
@@ -19,21 +17,36 @@ type PatientDetailProps = {
 };
 
 export default function PatientDetail({ patientId, onBack }: PatientDetailProps) {
-  const hoy = useMemo(() => fechaIsoLima(new Date()), []);
-  const agenda = useAsync(() => agendaOdontologo(sumarDias(hoy, -DIAS_ATRAS), sumarDias(hoy, DIAS_ADELANTE)), [hoy]);
+  const rango = useMemo(() => rangoAgendaOdontologo(), []);
+  const agenda = useAsync(() => agendaOdontologo(rango.desde, rango.hastaExclusivo), [rango]);
   const historias = useAsync((signal) => historiasEscritasPara(patientId, signal), [patientId]);
   const detalle = useAsync((signal) => detallePaciente(patientId, signal), [patientId]);
 
+  const citasPaciente = useMemo(() => (agenda.data ?? []).filter((c) => c.paciente?.id === patientId), [agenda.data, patientId]);
   const pacienteAgenda = useMemo(() => agruparPacientes(agenda.data ?? []).find((p) => p.id === patientId), [agenda.data, patientId]);
   const nombrePaciente = detalle.data
     ? `${detalle.data.nombre} ${detalle.data.apellido}`.trim()
     : pacienteAgenda?.nombre ?? '';
   const paciente = pacienteAgenda;
-  const citasPaciente = paciente?.citas ?? [];
-  const listaHistorias = useMemo<Historia[]>(() => historias.data ?? [], [historias.data]);
+  const [recienGuardadas, setRecienGuardadas] = useState<Historia[]>([]);
+  const listaHistorias = useMemo<Historia[]>(() => {
+    const porCita = new Map<string, Historia>();
+    for (const h of historias.data ?? []) porCita.set(h.citaId, h);
+    for (const h of recienGuardadas) porCita.set(h.citaId, h);
+    return [...porCita.values()].sort((a, b) => b.fechaCita.localeCompare(a.fechaCita));
+  }, [historias.data, recienGuardadas]);
   const conHistoria = useMemo(() => new Set(listaHistorias.map((h) => h.citaId)), [listaHistorias]);
-  // Una historia solo se escribe una vez por cita y solo cuando la cita ya fue atendida.
-  const pendientesDeHistoria = citasPaciente.filter((c) => c.estado === 'COMPLETADA' && !conHistoria.has(c.id));
+  // Citas pendientes (recientes)
+  const pendientesDeHistoria = citasPaciente.filter((c) => 
+    c.estado === 'COMPLETADA' && 
+    !conHistoria.has(c.id) && 
+    new Date(c.inicio).getTime() <= Date.now()
+  ).sort((a, b) => b.inicio.localeCompare(a.inicio));
+
+  // Citas pendientes antiguas (obtenidas mediante hook)
+  const citasAntiguas = useCitasAntiguas(patientId);
+  const todasLasPendientes = [...pendientesDeHistoria, ...citasAntiguas];
+  const pendingCount = todasLasPendientes.length;
 
   const [formCita, setFormCita] = useState<CitaApi | null>(null);
   const [diagnostico, setDiagnostico] = useState('');
@@ -56,10 +69,15 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
     setGuardando(true);
     setErrorForm(null);
     try {
-      await registrarHistoria(formCita.id, { diagnostico: diagnostico.trim(), tratamiento: tratamiento.trim(), notas: notas.trim() || undefined });
+      const creada = await registrarHistoria(formCita.id, { diagnostico: diagnostico.trim(), tratamiento: tratamiento.trim(), notas: notas.trim() || undefined });
+      setRecienGuardadas((prev) => [creada, ...prev.filter((h) => h.citaId !== creada.citaId)]);
       setFormCita(null);
+      setDiagnostico('');
+      setTratamiento('');
+      setNotas('');
       historias.reload();
     } catch (e) {
+      if (e instanceof ApiError && e.status === 409) historias.reload();
       setErrorForm(e instanceof ApiError ? e.message : 'No se pudo guardar la historia clínica.');
     } finally {
       setGuardando(false);
@@ -136,13 +154,20 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
         </div>
       </motion.div>
 
+      {agenda.error && (
+        <div role="alert" className="rounded-2xl border border-slatey-100 bg-white p-4 text-center space-y-2">
+          <p className="text-xs text-slatey-600">{agenda.error}</p>
+          <Button size="sm" onClick={agenda.reload}>Reintentar</Button>
+        </div>
+      )}
+
       {/* Citas atendidas sin historia */}
       {pendientesDeHistoria.length > 0 && !formCita && (
         <div className="bg-accent-50 border border-accent-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-start gap-2">
             <ClipboardList className="w-4 h-4 text-accent-600 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-accent-700">
-              Tienes {pendientesDeHistoria.length} {pendientesDeHistoria.length === 1 ? 'cita atendida' : 'citas atendidas'} sin historia clínica. Se escribe una sola vez por cita y no se puede editar después.
+              Tienes {pendientesDeHistoria.length} {pendientesDeHistoria.length === 1 ? 'cita atendida' : 'citas atendidas'} sin historia, desde {AGENDA_DIAS_ANTES === 1 ? 'ayer' : `${AGENDA_DIAS_ANTES} días atrás`} hasta {AGENDA_DIAS_DESPUES} días adelante. Se escribe una sola vez por cita.
             </p>
           </div>
           {pendientesDeHistoria.map((c) => (
@@ -151,7 +176,7 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
                 <p className="text-xs font-bold text-slatey-900 truncate">{c.servicio.titulo}</p>
                 <p className="text-[11px] text-slatey-500">{diaLima(c.inicio)} · {horaLima(c.inicio)}</p>
               </div>
-              <Button size="sm" onClick={() => abrirForm(c)}><Plus className="w-3.5 h-3.5" /> Registrar</Button>
+              <Button size="sm" onClick={() => abrirForm(c)}><Plus className="w-3.5 h-3.5" /> Nuevo registro</Button>
             </div>
           ))}
         </div>
@@ -187,7 +212,7 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
             <Button size="sm" onClick={historias.reload}>Reintentar</Button>
           </div>
         )}
-        {!historias.loading && !historias.error && listaHistorias.length === 0 && (
+        {!historias.loading && !historias.error && listaHistorias.length === 0 && pendingCount === 0 && (
           <div className="rounded-2xl border border-dashed border-slatey-200 bg-white p-6 text-center">
             <FileText className="w-7 h-7 text-slatey-300 mx-auto mb-2" />
             <p className="text-sm font-bold text-slatey-900">Sin historia clínica todavía</p>
