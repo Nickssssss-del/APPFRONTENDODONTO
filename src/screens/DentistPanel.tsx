@@ -71,6 +71,7 @@ export default function DentistPanel() {
                 key={selectedPatientId ?? ''}
                 patientId={selectedPatientId ?? ''}
                 onBack={cerrarFicha}
+                volverEtiqueta={`Volver a ${TABS.find((t) => t.id === dentistTab)?.label ?? 'Inicio'}`}
               />
             </motion.div>
           ) : (

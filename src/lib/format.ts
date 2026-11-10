@@ -67,18 +67,51 @@ export function sumarDias(fecha: string, dias: number): string {
 }
 
 /**
- * Ventana única de la agenda del odontólogo y de la ficha del paciente.
- * Inicio: un día atrás (la alternativa «mañana» dejaría fuera la cita de hoy).
- * Fin: 62 días después de hoy, inclusive. `hasta` del backend es exclusivo.
+ * Máximo de días que acepta GET /api/odontologos/yo/citas entre `desde` y `hasta` (exclusivo).
+ * Regla del backend: CitaService.agenda → 400 «El rango de la agenda debe ser de 1 a 62 días».
+ */
+export const MAX_DIAS_RANGO_AGENDA = 62;
+
+/** Días entre dos fechas 'AAAA-MM-DD' (b − a). */
+export function diasEntre(a: string, b: string): number {
+  const [ya, ma, da] = a.split('-').map(Number);
+  const [yb, mb, db] = b.split('-').map(Number);
+  return Math.round((Date.UTC(yb, mb - 1, db) - Date.UTC(ya, ma - 1, da)) / 86_400_000);
+}
+
+/** true si el backend acepta el rango [desde, hastaExclusivo). */
+export function rangoAgendaValido(desde: string, hastaExclusivo: string): boolean {
+  const dias = diasEntre(desde, hastaExclusivo);
+  return dias >= 1 && dias <= MAX_DIAS_RANGO_AGENDA;
+}
+
+/**
+ * Ventana de la agenda del odontólogo: ayer + hoy + 60 días = 62 días, el máximo permitido.
+ * Incluye ayer para poder marcar o revisar las citas del día anterior.
  */
 export const AGENDA_DIAS_ANTES = 1;
-export const AGENDA_DIAS_DESPUES = 62;
+export const AGENDA_DIAS_DESPUES = MAX_DIAS_RANGO_AGENDA - AGENDA_DIAS_ANTES - 1; // 60
 
 export function rangoAgendaOdontologo(ahora = new Date()) {
   const hoy = fechaIsoLima(ahora);
   const desde = sumarDias(hoy, -AGENDA_DIAS_ANTES);
   const ultimo = sumarDias(hoy, AGENDA_DIAS_DESPUES);
   return { hoy, desde, ultimo, hastaExclusivo: sumarDias(ultimo, 1) };
+}
+
+/**
+ * Tramos consecutivos hacia atrás, cada uno ≤ 62 días y sin solaparse (no generan duplicados).
+ * El primero termina mañana (exclusivo), así que incluye hoy.
+ */
+export function tramosAgendaHaciaAtras(cantidad: number, ahora = new Date()): { desde: string; hastaExclusivo: string }[] {
+  const tramos: { desde: string; hastaExclusivo: string }[] = [];
+  let hasta = sumarDias(fechaIsoLima(ahora), 1);
+  for (let i = 0; i < cantidad; i++) {
+    const desde = sumarDias(hasta, -MAX_DIAS_RANGO_AGENDA);
+    tramos.push({ desde, hastaExclusivo: hasta });
+    hasta = desde;
+  }
+  return tramos;
 }
 
 export function diasAgendaOdontologo(ahora = new Date()) {

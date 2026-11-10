@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Clock, AlertCircle, ChevronDown, ChevronUp, ShieldCheck, Phone, Mail, MessageCircle, Loader2, CheckCircle2, XCircle, FileText,
+  Clock, AlertCircle, ChevronDown, ChevronUp, ShieldCheck, Phone, Mail, MessageCircle, CheckCircle2, XCircle, FileText,
 } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
@@ -9,7 +9,7 @@ import {
   agendaOdontologo, confirmarCita, completarCita, marcarInasistencia, type CitaApi, type EstadoCita,
 } from '@/api/citas';
 import { ApiError } from '@/api/http';
-import { diasAgendaOdontologo, sumarDias, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
+import { diasAgendaOdontologo, rangoAgendaOdontologo, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
 
 type Variante = 'success' | 'primary' | 'warning' | 'error' | 'neutral';
 const statusConfig: Record<EstadoCita, { variant: Variante; dot: string }> = {
@@ -32,16 +32,17 @@ type AgendaProps = {
 const iniciales = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'PA';
 
 export default function Agenda({ onGoToPatient }: AgendaProps) {
+  const rango = useMemo(() => rangoAgendaOdontologo(), []);
   const dias = useMemo(() => diasAgendaOdontologo(), []);
-  const [selectedDateIdx, setSelectedDateIdx] = useState(() => Math.max(0, dias.findIndex((d) => d.fecha === fechaIsoLima(new Date()))));
+  const [selectedDateIdx, setSelectedDateIdx] = useState(() => Math.max(0, dias.findIndex((d) => d.fecha === rango.hoy)));
   const diaActivo = useRef<HTMLButtonElement>(null);
   useEffect(() => { diaActivo.current?.scrollIntoView({ inline: 'center', block: 'nearest' }); }, []);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [accionEn, setAccionEn] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
 
-  // `hasta` es exclusivo: se pide un día más allá del último visible.
-  const agenda = useAsync(() => agendaOdontologo(dias[0].fecha, sumarDias(dias[dias.length - 1].fecha, 1)), [dias]);
+  // Ventana de 62 días (ayer → hoy+60), el máximo que acepta el backend. `hasta` es exclusivo.
+  const agenda = useAsync(() => agendaOdontologo(rango.desde, rango.hastaExclusivo), [rango]);
   const citasDelDia = useMemo(() => {
     const fecha = dias[selectedDateIdx].fecha;
     return (agenda.data ?? [])
@@ -68,22 +69,25 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
   return (
     <div className="space-y-4">
       {/* Date Carousel */}
-      <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
+      <div role="tablist" aria-label="Días de la agenda" className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-2">
         {dias.map((d, i) => {
           const active = selectedDateIdx === i;
+          const esHoy = d.fecha === rango.hoy;
           return (
             <button
               key={d.fecha}
+              role="tab"
+              aria-selected={active}
               ref={active ? diaActivo : undefined}
               onClick={() => setSelectedDateIdx(i)}
-              className={`flex-shrink-0 flex flex-col items-center gap-0.5 px-4 py-3 rounded-2xl border-2 transition-all min-w-[64px] ${
+              className={`flex-shrink-0 flex flex-col items-center gap-0.5 px-3 py-2.5 rounded-2xl border-2 transition-all min-w-[56px] ${
                 active
-                  ? 'border-primary-500 bg-primary-500 text-white'
+                  ? 'border-primary-500 bg-primary-500 text-white shadow-sm shadow-primary-500/20'
                   : 'border-slatey-200 bg-white text-slatey-600 hover:border-slatey-300'
               }`}
             >
-              <span className="text-xs font-semibold">{d.corto}</span>
-              <span className="text-lg font-extrabold">{d.numero}</span>
+              <span className={`text-[11px] font-semibold ${active ? 'text-primary-50' : ''}`}>{esHoy ? 'Hoy' : d.corto}</span>
+              <span className={`text-lg font-extrabold leading-none ${active ? 'text-white' : 'text-slatey-900'}`}>{d.numero}</span>
             </button>
           );
         })}
@@ -91,7 +95,9 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
 
       <div className="flex items-center justify-between px-1">
         <h3 className="text-sm font-bold text-slatey-900">{dias[selectedDateIdx].etiqueta}</h3>
-        <Badge variant="primary" size="sm">{citasDelDia.length} citas</Badge>
+        {!agenda.loading && !agenda.error && (
+          <Badge variant="primary" size="sm">{citasDelDia.length} {citasDelDia.length === 1 ? 'cita' : 'citas'}</Badge>
+        )}
       </div>
 
       {errorAccion && (
@@ -102,19 +108,27 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
       )}
 
       {agenda.loading && (
-        <div className="flex justify-center py-10" aria-busy="true">
-          <Loader2 className="w-6 h-6 text-primary-500 animate-spin" aria-label="Cargando agenda" />
+        <div className="space-y-3" aria-busy="true" aria-label="Cargando agenda">
+          {[0, 1].map((k) => (
+            <div key={k} className="bg-white rounded-2xl border border-slatey-100 p-4 space-y-2">
+              <div className="h-3 w-1/2 rounded bg-slatey-100 animate-pulse" />
+              <div className="h-4 w-2/3 rounded bg-slatey-100 animate-pulse" />
+              <div className="h-3 w-1/3 rounded bg-slatey-100 animate-pulse" />
+            </div>
+          ))}
         </div>
       )}
       {!agenda.loading && agenda.error && (
-        <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-slatey-100 bg-white p-8 text-center">
-          <AlertCircle className="w-7 h-7 text-accent-600" />
-          <p className="text-sm text-slatey-600">{agenda.error}</p>
-          <Button size="sm" onClick={agenda.reload}>Reintentar</Button>
+        <div role="alert" className="flex flex-col items-center gap-2 rounded-2xl border border-error-100 bg-white p-6 text-center">
+          <AlertCircle className="w-7 h-7 text-error-500" />
+          <p className="text-sm font-bold text-error-700">No se pudo cargar la agenda</p>
+          <p className="text-xs text-slatey-600">{agenda.error}</p>
+          <Button size="sm" className="mt-1" onClick={agenda.reload}>Reintentar</Button>
         </div>
       )}
       {!agenda.loading && !agenda.error && citasDelDia.length === 0 && (
         <div className="rounded-2xl border border-dashed border-slatey-200 bg-white p-8 text-center">
+          <Clock className="w-7 h-7 text-slatey-300 mx-auto mb-2" />
           <p className="text-sm font-bold text-slatey-900">Sin citas este día</p>
           <p className="text-xs text-slatey-500 mt-1">Las citas con depósito pagado aparecerán aquí.</p>
         </div>
@@ -140,33 +154,37 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
                   isExpanded ? 'border-primary-300 shadow-md shadow-primary-500/5' : 'border-slatey-100'
                 }`}
               >
-                <button onClick={() => setExpandedId(isExpanded ? null : c.id)} className="w-full flex items-center gap-3 p-4 text-left">
-                  <div className="relative flex-shrink-0">
-                    <div className="w-12 h-12 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-bold" aria-hidden="true">
-                      {iniciales(nombre)}
-                    </div>
-                    <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white ${status.dot}`} />
+                <button
+                  onClick={() => setExpandedId(isExpanded ? null : c.id)}
+                  aria-expanded={isExpanded}
+                  className="w-full flex items-start gap-3 p-4 text-left"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary-100 text-primary-700 flex items-center justify-center text-xs font-bold flex-shrink-0" aria-hidden="true">
+                    {iniciales(nombre)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5 text-slatey-400" />
-                      <span className="text-sm font-bold text-slatey-900">{horaLima(c.inicio)}</span>
-                      <span className="text-xs text-slatey-500">·</span>
-                      <span className="text-xs text-slatey-500 truncate">{c.servicio.titulo}</span>
+                    <div className="flex items-center gap-1.5 text-xs text-slatey-500 min-w-0">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${status.dot}`} aria-hidden="true" />
+                      <span className="font-bold text-slatey-900">{horaLima(c.inicio)}</span>
+                      <span aria-hidden="true">·</span>
+                      <span className="truncate">{c.servicio.titulo}</span>
                     </div>
-                    <p className="text-sm font-semibold text-slatey-900 mt-0.5">{nombre}</p>
-                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      <Badge variant={status.variant} size="sm">{ETIQUETA_ESTADO[c.estado]}</Badge>
+                    <p className="text-sm font-bold text-slatey-900 mt-1 truncate">{nombre}</p>
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                       {pagado && (
-                        <Badge variant="success" size="sm">
-                          <ShieldCheck className="w-3 h-3" /> {soles(c.depositoRequerido)}
+                        <Badge variant="success" size="sm" className="whitespace-nowrap">
+                          <ShieldCheck className="w-3 h-3" /> Depósito {soles(c.depositoRequerido)}
                         </Badge>
                       )}
+                      <span className="text-[11px] text-slatey-500 whitespace-nowrap">Total {soles(c.precio)}</span>
                     </div>
                   </div>
-                  <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} className="text-slatey-400">
-                    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                  </motion.div>
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <Badge variant={status.variant} size="sm">{ETIQUETA_ESTADO[c.estado]}</Badge>
+                    <span className="text-slatey-400" aria-hidden="true">
+                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </span>
+                  </div>
                 </button>
 
                 <AnimatePresence>

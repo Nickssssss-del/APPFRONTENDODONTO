@@ -9,14 +9,6 @@ export type DocumentoOdontologo = { id: string; tipo: TipoDocumento; subidoEn: s
 const MAX_BYTES = 5 * 1024 * 1024; // el backend rechaza > 5 MB con 413
 export const IMAGENES_PERMITIDAS = ['image/jpeg', 'image/png', 'image/webp'];
 
-const MIME_A_FORMATO: Record<string, 'jpeg' | 'png' | 'webp'> = {
-  'image/jpeg': 'jpeg',
-  'image/jpg': 'jpeg',
-  'image/pjpeg': 'jpeg',
-  'image/png': 'png',
-  'image/x-png': 'png',
-  'image/webp': 'webp',
-};
 const EXTENSION_A_FORMATO: Record<string, 'jpeg' | 'png' | 'webp'> = {
   jpg: 'jpeg', jpeg: 'jpeg', png: 'png', webp: 'webp',
 };
@@ -57,10 +49,9 @@ async function formatoDe(file: File): Promise<'jpeg' | 'png' | 'webp' | 'heic' |
   const cabecera = new Uint8Array(await file.slice(0, 16).arrayBuffer());
   const porBytes = formatoPorBytes(cabecera);
   if (porBytes === 'heic') return 'heic';
-  if (porBytes) return porBytes;
-  if (MIME_A_FORMATO[tipo]) return MIME_A_FORMATO[tipo];
-  if (tipo === '' || tipo === 'application/octet-stream') return EXTENSION_A_FORMATO[extension] ?? null;
-  return null;
+  // Solo cuentan los bytes, igual que en el backend (ArchivoService.detectarFormato): un MIME o una extensión
+  // de imagen sobre otro contenido (p. ej. un .html renombrado a .jpg) el servidor lo rechazaría igual.
+  return porBytes;
 }
 
 /**

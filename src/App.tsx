@@ -158,7 +158,8 @@ function AppContent() {
   const { screen, setScreen, isAuth, role, sessionLoading, perfilListo } = useApp();
   const visible = pantallaVisible(screen, { sessionLoading, isAuth, perfilListo, role });
   const isPatientScreen = PATIENT_SCREENS.has(visible);
-  const showPatientBottomNav = isPatientScreen && visible !== 'checkout';
+  // El odontólogo también abre el chat, pero no usa la barra inferior del paciente.
+  const showPatientBottomNav = isPatientScreen && visible !== 'checkout' && !(visible === 'chatbot' && role === 'dentist');
 
   // Alinea el estado con la pantalla permitida. No corre mientras el rol todavía es el valor por defecto.
   useEffect(() => {

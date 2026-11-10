@@ -1,33 +1,30 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, FileText, CheckCircle2, Plus, Loader2, AlertCircle, Phone, Mail, Stethoscope, Pill, ClipboardList } from 'lucide-react';
 import { Badge, Button } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
-import { useCitasAntiguas } from '@/hooks/useCitasAntiguas';
+import { useCitasPendientesDeHistoria } from '@/hooks/useCitasPendientesDeHistoria';
 import { ApiError } from '@/api/http';
-import { agendaOdontologo, type CitaApi } from '@/api/citas';
+import type { CitaApi } from '@/api/citas';
 import { detallePaciente, historiasEscritasPara, registrarHistoria, type Historia } from '@/api/panel';
-import { agruparPacientes, iniciales } from '@/lib/pacientes';
-import { AGENDA_DIAS_ANTES, AGENDA_DIAS_DESPUES, diaLima, horaLima, rangoAgendaOdontologo } from '@/lib/format';
+import { iniciales } from '@/lib/pacientes';
+import { diaLima, horaLima } from '@/lib/format';
 
 type PatientDetailProps = {
   /** id del paciente (usuario) tal como lo devuelve el backend en cita.paciente.id */
   patientId: string;
   onBack: () => void;
+  /** Texto del enlace de regreso, p. ej. «Volver a Pacientes». */
+  volverEtiqueta?: string;
 };
 
-export default function PatientDetail({ patientId, onBack }: PatientDetailProps) {
-  const rango = useMemo(() => rangoAgendaOdontologo(), []);
-  const agenda = useAsync(() => agendaOdontologo(rango.desde, rango.hastaExclusivo), [rango]);
-  const historias = useAsync((signal) => historiasEscritasPara(patientId, signal), [patientId]);
-  const detalle = useAsync((signal) => detallePaciente(patientId, signal), [patientId]);
+const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
 
-  const citasPaciente = useMemo(() => (agenda.data ?? []).filter((c) => c.paciente?.id === patientId), [agenda.data, patientId]);
-  const pacienteAgenda = useMemo(() => agruparPacientes(agenda.data ?? []).find((p) => p.id === patientId), [agenda.data, patientId]);
-  const nombrePaciente = detalle.data
-    ? `${detalle.data.nombre} ${detalle.data.apellido}`.trim()
-    : pacienteAgenda?.nombre ?? '';
-  const paciente = pacienteAgenda;
+export default function PatientDetail({ patientId, onBack, volverEtiqueta = 'Volver' }: PatientDetailProps) {
+  const detalle = useAsync((signal) => detallePaciente(patientId, signal), [patientId]);
+  const historias = useAsync((signal) => historiasEscritasPara(patientId, signal), [patientId]);
+
+  // Historias del servidor + las recién guardadas (se ven al instante, sin esperar la recarga). Una por cita.
   const [recienGuardadas, setRecienGuardadas] = useState<Historia[]>([]);
   const listaHistorias = useMemo<Historia[]>(() => {
     const porCita = new Map<string, Historia>();
@@ -36,17 +33,31 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
     return [...porCita.values()].sort((a, b) => b.fechaCita.localeCompare(a.fechaCita));
   }, [historias.data, recienGuardadas]);
   const conHistoria = useMemo(() => new Set(listaHistorias.map((h) => h.citaId)), [listaHistorias]);
-  // Citas pendientes (recientes)
-  const pendientesDeHistoria = citasPaciente.filter((c) => 
-    c.estado === 'COMPLETADA' && 
-    !conHistoria.has(c.id) && 
-    new Date(c.inicio).getTime() <= Date.now()
-  ).sort((a, b) => b.inicio.localeCompare(a.inicio));
 
-  // Citas pendientes antiguas (obtenidas mediante hook)
-  const citasAntiguas = useCitasAntiguas(patientId);
-  const todasLasPendientes = [...pendientesDeHistoria, ...citasAntiguas];
-  const pendingCount = todasLasPendientes.length;
+  // Pendientes reales = citas atendidas (backend) − historias registradas (el backend admite una por cita COMPLETADA).
+  const atendidas = detalle.data?.citasAtendidas;
+  const objetivo = typeof atendidas === 'number' && historias.data ? Math.max(0, atendidas - listaHistorias.length) : null;
+
+  // La búsqueda arranca una sola vez, cuando detalle e historias ya respondieron (con datos o con error).
+  const [listo, setListo] = useState(false);
+  useEffect(() => {
+    if (!detalle.loading && !historias.loading) setListo(true);
+  }, [detalle.loading, historias.loading]);
+  const busqueda = useCitasPendientesDeHistoria(patientId, { listo, objetivo, conHistoria });
+
+  const pendientes = useMemo(
+    () => (busqueda.data?.citas ?? []).filter((c) => !conHistoria.has(c.id)),
+    [busqueda.data, conHistoria],
+  );
+  const totalPendientes = Math.max(objetivo ?? 0, pendientes.length);
+  const buscando = !listo || busqueda.loading;
+  const noListadas = !buscando && busqueda.data ? totalPendientes - pendientes.length : 0;
+
+  const nombrePaciente = detalle.data
+    ? (detalle.data.nombreCompleto || `${detalle.data.nombre} ${detalle.data.apellido}`).trim()
+    : busqueda.data?.citas[0]?.paciente?.nombre ?? '';
+  const telefono = detalle.data?.telefono ?? null;
+  const correo = detalle.data?.correo ?? null;
 
   const [formCita, setFormCita] = useState<CitaApi | null>(null);
   const [diagnostico, setDiagnostico] = useState('');
@@ -77,6 +88,7 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
       setNotas('');
       historias.reload();
     } catch (e) {
+      // 409: la cita ya tiene historia (p. ej. desde otro dispositivo). Se recarga para que salga de pendientes.
       if (e instanceof ApiError && e.status === 409) historias.reload();
       setErrorForm(e instanceof ApiError ? e.message : 'No se pudo guardar la historia clínica.');
     } finally {
@@ -84,106 +96,128 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
     }
   };
 
-  const nadaListo = !agenda.data && !detalle.data && !historias.data;
-  if (nadaListo && (agenda.loading || detalle.loading || historias.loading)) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20" aria-busy="true">
-        <Loader2 className="w-8 h-8 text-primary-500 animate-spin mb-3" />
-        <p className="text-sm text-slatey-500">Cargando historia clínica...</p>
-      </div>
-    );
-  }
-
-  if ((agenda.error && detalle.error && !historias.data) || (!paciente && !detalle.data && !detalle.loading && !agenda.loading && !historias.data)) {
-    return (
-      <div className="space-y-4">
-        <button onClick={onBack} className="flex items-center gap-2 text-sm text-slatey-500 hover:text-slatey-700 font-medium">
-          <ArrowLeft className="w-4 h-4" /> Volver
-        </button>
-        <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-slatey-100 bg-white p-8 text-center">
-          <AlertCircle className="w-7 h-7 text-accent-600" />
-          <p className="text-sm text-slatey-600">{agenda.error ?? detalle.error ?? 'No encontramos a este paciente.'}</p>
-          {(agenda.error || detalle.error) && <Button size="sm" onClick={() => { agenda.reload(); detalle.reload(); }}>Reintentar</Button>}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      <button onClick={onBack} className="flex items-center gap-2 text-sm text-slatey-500 hover:text-slatey-700 font-medium">
-        <ArrowLeft className="w-4 h-4" /> Volver
+      <button onClick={onBack} className="flex items-center gap-2 text-sm text-slatey-500 hover:text-slatey-700 font-medium min-h-[44px]">
+        <ArrowLeft className="w-4 h-4" /> {volverEtiqueta}
       </button>
 
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl p-5 border border-slatey-100">
-        <div className="flex items-start gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center text-xl font-bold flex-shrink-0" aria-hidden="true">
-            {iniciales(nombrePaciente)}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="text-lg font-bold text-slatey-900 font-display">{nombrePaciente}</h2>
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <Badge variant="primary" size="sm"><CheckCircle2 className="w-3 h-3" /> {paciente?.visitas ?? 0} {(paciente?.visitas ?? 0) === 1 ? 'visita' : 'visitas'}</Badge>
-              {paciente?.ultimaCita && <Badge variant="neutral" size="sm">Última: {diaLima(paciente.ultimaCita)}</Badge>}
+      {/* Datos del paciente */}
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        aria-label="Datos del paciente"
+        className="bg-white rounded-2xl p-4 border border-slatey-100"
+      >
+        {detalle.loading && !detalle.data ? (
+          <div className="flex items-center gap-3" aria-busy="true" aria-label="Cargando datos del paciente">
+            <div className="w-14 h-14 rounded-2xl bg-slatey-100 animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-2/3 rounded bg-slatey-100 animate-pulse" />
+              <div className="h-3 w-1/3 rounded bg-slatey-100 animate-pulse" />
             </div>
           </div>
-        </div>
-        <div className="space-y-2 mt-4">
-          {paciente?.telefono && (
-            <a href={`tel:${paciente.telefono.replace(/\s/g, '')}`} className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm font-semibold text-slatey-900">
-              <Phone className="w-4 h-4 text-slatey-400" /> {paciente.telefono}
-            </a>
-          )}
-          {paciente?.correo && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm font-semibold text-slatey-900 min-w-0">
-              <Mail className="w-4 h-4 text-slatey-400 flex-shrink-0" /> <span className="truncate">{paciente.correo}</span>
+        ) : (
+          <>
+            <div className="flex items-center gap-3">
+              <div className="w-14 h-14 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center text-lg font-bold flex-shrink-0" aria-hidden="true">
+                {iniciales(nombrePaciente || 'Paciente')}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-bold text-slatey-900 font-display leading-tight break-words">{nombrePaciente || 'Paciente'}</h2>
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {typeof atendidas === 'number' && (
+                    <Badge variant="primary" size="sm"><CheckCircle2 className="w-3 h-3" /> {plural(atendidas, 'visita atendida', 'visitas atendidas')}</Badge>
+                  )}
+                  {detalle.data?.ultimaAtencion && <Badge variant="neutral" size="sm">Última: {diaLima(detalle.data.ultimaAtencion)}</Badge>}
+                </div>
+              </div>
             </div>
-          )}
-          <div className="space-y-2 pt-2 border-t border-slatey-100">
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-900">
-              <AlertCircle className="w-4 h-4 text-slatey-400 flex-shrink-0" />
-              <span className="font-semibold">Alergias:</span>
-              <span className="text-slatey-500 ml-2">{detalle.data?.alergias || 'No disponible'}</span>
-            </div>
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-slatey-50 text-sm text-slatey-900">
-              <FileText className="w-4 h-4 text-slatey-400 flex-shrink-0" />
-              <span className="font-semibold">Antecedentes:</span>
-              <span className="text-slatey-500 ml-2">{detalle.data?.antecedentes || 'No disponible'}</span>
-            </div>
-          </div>
-        </div>
-      </motion.div>
 
-      {agenda.error && (
-        <div role="alert" className="rounded-2xl border border-slatey-100 bg-white p-4 text-center space-y-2">
-          <p className="text-xs text-slatey-600">{agenda.error}</p>
-          <Button size="sm" onClick={agenda.reload}>Reintentar</Button>
-        </div>
-      )}
+            {(telefono || correo) && (
+              <div className="mt-3 space-y-1.5 text-sm">
+                {telefono && (
+                  <a href={`tel:${telefono.replace(/\s/g, '')}`} className="flex items-center gap-2 text-slatey-700 font-medium min-h-[32px]">
+                    <Phone className="w-4 h-4 text-slatey-400 flex-shrink-0" /> {telefono}
+                  </a>
+                )}
+                {correo && (
+                  <p className="flex items-center gap-2 text-slatey-700 font-medium min-w-0">
+                    <Mail className="w-4 h-4 text-slatey-400 flex-shrink-0" /> <span className="truncate">{correo}</span>
+                  </p>
+                )}
+              </div>
+            )}
 
-      {/* Citas atendidas sin historia */}
-      {pendientesDeHistoria.length > 0 && !formCita && (
-        <div className="bg-accent-50 border border-accent-200 rounded-2xl p-4 space-y-3">
+            {(detalle.data?.alergias || detalle.data?.antecedentes) && (
+              <div className="mt-3 pt-3 border-t border-slatey-100 space-y-1 text-xs">
+                {detalle.data?.alergias && (
+                  <p><span className="font-bold text-error-600">Alergias:</span> <span className="text-slatey-700">{detalle.data.alergias}</span></p>
+                )}
+                {detalle.data?.antecedentes && (
+                  <p><span className="font-bold text-slatey-700">Antecedentes:</span> <span className="text-slatey-600">{detalle.data.antecedentes}</span></p>
+                )}
+              </div>
+            )}
+
+            {detalle.error && (
+              <div role="alert" className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-slatey-50 p-3">
+                <p className="text-xs text-slatey-600">{detalle.error}</p>
+                <Button size="sm" variant="outline" onClick={detalle.reload}>Reintentar</Button>
+              </div>
+            )}
+          </>
+        )}
+      </motion.section>
+
+      {/* Citas atendidas sin historia clínica */}
+      {!formCita && (buscando ? (objetivo ?? 0) > 0 : (totalPendientes > 0 || !!busqueda.error)) && (
+        <section aria-label="Citas atendidas sin historia clínica" className="bg-accent-50 border border-accent-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-start gap-2">
             <ClipboardList className="w-4 h-4 text-accent-600 flex-shrink-0 mt-0.5" />
             <p className="text-xs text-accent-700">
-              Tienes {pendientesDeHistoria.length} {pendientesDeHistoria.length === 1 ? 'cita atendida' : 'citas atendidas'} sin historia, desde {AGENDA_DIAS_ANTES === 1 ? 'ayer' : `${AGENDA_DIAS_ANTES} días atrás`} hasta {AGENDA_DIAS_DESPUES} días adelante. Se escribe una sola vez por cita.
+              {totalPendientes > 0 && (
+                <><strong>{plural(totalPendientes, 'cita atendida', 'citas atendidas')} sin historia clínica.</strong> </>
+              )}
+              Se registra una sola vez por cita y no se puede editar después.
             </p>
           </div>
-          {pendientesDeHistoria.map((c) => (
+
+          {buscando && (
+            <p className="flex items-center gap-2 text-xs text-accent-700" aria-busy="true">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Buscando las citas…
+            </p>
+          )}
+
+          {!buscando && busqueda.error && (
+            <div role="alert" className="flex items-center justify-between gap-2 rounded-xl bg-white p-3 border border-accent-100">
+              <p className="text-xs text-slatey-600">{busqueda.error}</p>
+              <Button size="sm" variant="outline" onClick={busqueda.reload}>Reintentar</Button>
+            </div>
+          )}
+
+          {!buscando && pendientes.map((c) => (
             <div key={c.id} className="flex items-center justify-between gap-2 bg-white rounded-xl p-3 border border-accent-100">
               <div className="min-w-0">
                 <p className="text-xs font-bold text-slatey-900 truncate">{c.servicio.titulo}</p>
                 <p className="text-[11px] text-slatey-500">{diaLima(c.inicio)} · {horaLima(c.inicio)}</p>
               </div>
-              <Button size="sm" onClick={() => abrirForm(c)}><Plus className="w-3.5 h-3.5" /> Nuevo registro</Button>
+              <Button size="sm" onClick={() => abrirForm(c)} disabled={guardando} className="flex-shrink-0">
+                <Plus className="w-3.5 h-3.5" /> Registrar
+              </Button>
             </div>
           ))}
-        </div>
+
+          {noListadas > 0 && busqueda.data && (
+            <p className="rounded-xl bg-white/70 p-2.5 text-[11px] text-slatey-600">
+              {plural(noListadas, 'cita es anterior', 'citas son anteriores')} al {diaLima(`${busqueda.data.revisadoDesde}T12:00:00Z`)} y no se muestra{noListadas === 1 ? '' : 'n'} aquí.
+            </p>
+          )}
+        </section>
       )}
 
       {formCita && (
-        <div className="bg-white rounded-2xl border-2 border-primary-200 p-4 space-y-3">
+        <section aria-label="Registrar historia clínica" className="bg-white rounded-2xl border-2 border-primary-200 p-4 space-y-3">
           <div>
             <p className="text-sm font-bold text-slatey-900">Historia clínica</p>
             <p className="text-xs text-slatey-500">{formCita.servicio.titulo} · {diaLima(formCita.inicio)} · {horaLima(formCita.inicio)}</p>
@@ -196,23 +230,25 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
             <Button variant="outline" onClick={() => setFormCita(null)} disabled={guardando}>Cancelar</Button>
             <Button loading={guardando} onClick={guardar}>Guardar</Button>
           </div>
-        </div>
+        </section>
       )}
 
-      {/* Historias escritas */}
-      <div className="space-y-3">
+      {/* Historias registradas */}
+      <section aria-label="Historia clínica" className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-sm font-bold text-slatey-900">Historia clínica</h3>
-          <Badge variant="neutral" size="sm">{listaHistorias.length} {listaHistorias.length === 1 ? 'registro' : 'registros'}</Badge>
+          <Badge variant="primary" size="sm">{plural(listaHistorias.length, 'registro', 'registros')}</Badge>
         </div>
-        {historias.loading && <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 text-primary-500 animate-spin" aria-label="Cargando" /></div>}
+        {historias.loading && listaHistorias.length === 0 && (
+          <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 text-primary-500 animate-spin" aria-label="Cargando historias" /></div>
+        )}
         {historias.error && (
           <div role="alert" className="rounded-2xl border border-slatey-100 bg-white p-4 text-center space-y-2">
             <p className="text-xs text-slatey-600">{historias.error}</p>
             <Button size="sm" onClick={historias.reload}>Reintentar</Button>
           </div>
         )}
-        {!historias.loading && !historias.error && listaHistorias.length === 0 && pendingCount === 0 && (
+        {!historias.loading && !historias.error && listaHistorias.length === 0 && totalPendientes === 0 && !buscando && (
           <div className="rounded-2xl border border-dashed border-slatey-200 bg-white p-6 text-center">
             <FileText className="w-7 h-7 text-slatey-300 mx-auto mb-2" />
             <p className="text-sm font-bold text-slatey-900">Sin historia clínica todavía</p>
@@ -220,8 +256,8 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
           </div>
         )}
         {listaHistorias.map((h, i) => (
-          <motion.div
-            key={h.id}
+          <motion.article
+            key={h.citaId}
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: Math.min(i, 8) * 0.04 }}
@@ -234,9 +270,16 @@ export default function PatientDetail({ patientId, onBack }: PatientDetailProps)
             <Bloque icon={<Stethoscope className="w-3.5 h-3.5" />} titulo="Diagnóstico" texto={h.diagnostico} />
             <Bloque icon={<Pill className="w-3.5 h-3.5" />} titulo="Tratamiento" texto={h.tratamiento} />
             {h.notas && <Bloque icon={<FileText className="w-3.5 h-3.5" />} titulo="Notas" texto={h.notas} />}
-          </motion.div>
+          </motion.article>
         ))}
-      </div>
+      </section>
+
+      {/* Sin datos de ningún lado: el paciente no existe para este odontólogo o no hay conexión. */}
+      {!detalle.loading && !historias.loading && detalle.error && historias.error && (
+        <p className="flex items-center gap-2 px-1 text-xs text-slatey-500">
+          <AlertCircle className="w-3.5 h-3.5" /> Revisa tu conexión y vuelve a intentarlo.
+        </p>
+      )}
     </div>
   );
 }

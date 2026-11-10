@@ -12,8 +12,13 @@ import { diaLima, horaLima } from '@/lib/format';
 type ChatItem = ChatMessage & { opciones?: OpcionChat[] };
 
 // Atajos: se envían al backend como cualquier mensaje escrito.
-const QUICK_REPLIES = [
+const QUICK_REPLIES_PACIENTE = [
   { label: 'Buscar odontólogo', icon: Calendar },
+  { label: 'Mis citas', icon: Clock },
+  { label: 'Menú', icon: ShieldCheck },
+];
+// El odontólogo no reserva por chat: el backend le responde con su agenda.
+const QUICK_REPLIES_ODONTOLOGO = [
   { label: 'Mis citas', icon: Clock },
   { label: 'Menú', icon: ShieldCheck },
 ];
@@ -25,13 +30,16 @@ export default function Chatbot() {
     {
       id: '1',
       sender: 'bot',
-      text: '¡Hola! Soy OdontoBot, tu asistente de orientación dental. ¿En qué puedo ayudarte hoy?',
+      text: role === 'dentist'
+        ? '¡Hola, doctor/a! Soy OdontoBot. Puedo mostrarte tu agenda de los próximos días. ¿Qué necesitas?'
+        : '¡Hola! Soy OdontoBot, tu asistente de orientación dental. ¿En qué puedo ayudarte hoy?',
       timestamp: Date.now(),
     },
   ]);
   const [input, setInput] = useState('');
   const [typing, setTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const quickReplies = role === 'dentist' ? QUICK_REPLIES_ODONTOLOGO : QUICK_REPLIES_PACIENTE;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -193,7 +201,7 @@ export default function Chatbot() {
           className="px-4 pb-2 w-full bg-transparent shrink-0"
         >
           <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {QUICK_REPLIES.map((qr) => {
+            {quickReplies.map((qr) => {
               const Icon = qr.icon;
               return (
                 <button
@@ -211,7 +219,7 @@ export default function Chatbot() {
       )}
 
       {/* Input Flotante / Inferior */}
-      <div className="bg-white border-t border-slatey-100 px-4 py-3 shrink-0 pb-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))]">
+      <div className={`bg-white border-t border-slatey-100 px-4 py-3 shrink-0 ${role === 'dentist' ? 'pb-[max(1rem,env(safe-area-inset-bottom))]' : 'pb-[max(5.5rem,calc(env(safe-area-inset-bottom)+4.5rem))]'}`}>
         <div className="flex items-center gap-2">
           <input
             type="text"
