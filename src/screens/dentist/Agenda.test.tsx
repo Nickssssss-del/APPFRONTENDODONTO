@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import type { CitaApi } from '@/api/citas';
 import { ApiError } from '@/api/http';
-import { rangoAgendaOdontologo, rangoAgendaValido } from '@/lib/format';
+import { fechaIsoLima, rangoAgendaOdontologo, rangoAgendaValido } from '@/lib/format';
 
 const api = vi.hoisted(() => ({ agendaOdontologo: vi.fn() }));
 vi.mock('@/api/citas', () => ({
@@ -23,7 +23,8 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
-const enUnaHora = new Date(Date.now() + 3_600_000).toISOString();
+// Hoy a mediodía en Lima: así la cita cae en el día seleccionado a cualquier hora en que corra la prueba.
+const enUnaHora = `${fechaIsoLima(new Date())}T12:00:00-05:00`;
 const cita: CitaApi = {
   id: 'c1', estado: 'CONFIRMADA', inicio: enUnaHora, fin: enUnaHora, zonaHoraria: 'America/Lima', precio: 120,
   depositoRequerido: 30, odontologo: { id: 'o1', nombre: 'Odontólogo' }, paciente: { id: 'p1', nombre: 'Prueba Uno' },

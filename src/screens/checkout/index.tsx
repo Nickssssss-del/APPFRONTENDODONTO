@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Loader2 } from 'lucide-react';
 import { useApp } from '../../storeHooks';
@@ -39,7 +39,11 @@ export default function CheckoutScreen() {
   } = useApp();
 
   // Sin horario elegido ni cita pendiente no hay nada que pagar: vuelve al marketplace.
+  // Excepto al salir tras un pago exitoso: «Ver mi cita» limpia la cita a propósito y ya eligió ir a Mis citas;
+  // sin esta marca, este efecto se disparaba antes de desmontar y mandaba a la ficha del odontólogo.
+  const saliendoTrasPago = useRef(false);
   useEffect(() => {
+    if (saliendoTrasPago.current) return;
     if (!activeCita && !selectedSlotStart) setScreen('marketplace');
   }, [activeCita, selectedSlotStart, setScreen]);
 
@@ -408,11 +412,12 @@ export default function CheckoutScreen() {
         startIso={activeCita?.inicio}
         endIso={activeCita?.fin}
         onClose={() => {
+          saliendoTrasPago.current = true;
+          setScreen('misCitas');
           setShowSuccess(false);
           setActiveCita(null);
           setSelectedSlotStart(null);
           setSelectedTime(null);
-          setScreen('misCitas');
         }}
       />
 

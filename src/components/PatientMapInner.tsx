@@ -1,5 +1,5 @@
-import { useEffect, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useMemo, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { type LatLngExpression } from 'leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -8,6 +8,7 @@ import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 import type { EstadoUbicacion, PinOdontologo } from './PatientMap';
 
 import { coordenadaValida } from '@/utils/coordenada';
+import { obtenerRuta, resumenRuta, urlComoLlegar, type Ruta } from '@/lib/rutas';
 delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: never })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -35,9 +36,20 @@ function Encuadre({ puntos }: { puntos: LatLngExpression[] }) {
   const map = useMap();
   useEffect(() => {
     if (puntos.length === 0) return;
-    if (puntos.length === 1) map.setView(puntos[0], 14);
-    else map.fitBounds(L.latLngBounds(puntos), { padding: [28, 28], maxZoom: 15 });
+    // Sin animación: los puntos llegan en tandas (tu ubicación, luego los consultorios) y Leaflet descarta un
+    // encuadre pedido mientras aún anima el anterior, dejando pines fuera de la vista.
     map.invalidateSize();
+    if (puntos.length === 1) map.setView(puntos[0], 14, { animate: false });
+    else map.fitBounds(L.latLngBounds(puntos), { padding: [28, 28], maxZoom: 15, animate: false });
+  }, [map, puntos]);
+  return null;
+}
+
+/** Al llegar la ruta, encuadra el recorrido y todos los pines (la ruta puede salir del área de los pines). */
+function EncuadreRuta({ puntos }: { puntos: LatLngExpression[] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.fitBounds(L.latLngBounds(puntos), { padding: [36, 36], maxZoom: 16, animate: false });
   }, [map, puntos]);
   return null;
 }
@@ -50,10 +62,11 @@ interface Props {
   onVerPerfil: (id: string) => void;
   onReservar: (id: string, nombre: string) => void;
   sinCoordenadas: number;
+  masCercanoId?: string | null;
 }
 
 export default function PatientMapInner({
-  dentists, userLocation, ubicacion, onCentrar, onVerPerfil, onReservar, sinCoordenadas,
+  dentists, userLocation, ubicacion, onCentrar, onVerPerfil, onReservar, sinCoordenadas, masCercanoId = null,
 }: Props) {
   const pines = useMemo(() => {
     const vistos = new Set<string>();
@@ -72,6 +85,26 @@ export default function PatientMapInner({
     if (userLocation) lista.push([userLocation.lat, userLocation.lng]);
     return lista;
   }, [pines, userLocation]);
+
+  // Ruta real por las calles hasta el más cercano. Si el servicio falla, línea recta de referencia.
+  const destinoLinea = userLocation && masCercanoId ? pines.find((d) => d.id === masCercanoId) : undefined;
+  const claveRuta = userLocation && destinoLinea
+    ? `${userLocation.lat},${userLocation.lng}>${destinoLinea.latitud},${destinoLinea.longitud}` : null;
+  const [ruta, setRuta] = useState<{ clave: string; ruta: Ruta | null; error: boolean } | null>(null);
+  useEffect(() => {
+    if (!claveRuta || !userLocation || !destinoLinea) return;
+    const ctrl = new AbortController();
+    obtenerRuta(userLocation, { lat: destinoLinea.latitud!, lng: destinoLinea.longitud! }, ctrl.signal)
+      .then((r) => setRuta({ clave: claveRuta, ruta: r, error: false }))
+      .catch((e: Error) => { if (e.name !== 'AbortError') setRuta({ clave: claveRuta, ruta: null, error: true }); });
+    return () => ctrl.abort();
+    // claveRuta resume origen y destino: evita repetir la petición en cada render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claveRuta]);
+  const rutaActual = ruta && ruta.clave === claveRuta ? ruta : null;
+  const cargandoRuta = !!claveRuta && !rutaActual;
+  const rutaReal = rutaActual?.ruta ?? null;
+  const puntosConRuta = useMemo<LatLngExpression[]>(() => [...puntos, ...(rutaReal?.puntos ?? [])], [puntos, rutaReal]);
 
   const avisoUbicacion = ubicacion === 'cargando'
     ? 'Buscando tu ubicación…'
@@ -100,6 +133,21 @@ export default function PatientMapInner({
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <Encuadre puntos={puntos} />
+            {rutaReal && (
+              <>
+                {/* Base clara + trazo animado encima: se lee como «camino hacia el consultorio». */}
+                <Polyline positions={rutaReal.puntos} pathOptions={{ color: '#99f6e4', weight: 9, opacity: 0.9, lineCap: 'round', lineJoin: 'round' }} />
+                {/* className va como prop: react-leaflet no lo toma dentro de pathOptions. */}
+                <Polyline className="ruta-animada" positions={rutaReal.puntos} pathOptions={{ color: '#0f766e', weight: 5, opacity: 1, lineCap: 'round', lineJoin: 'round' }} />
+                <EncuadreRuta puntos={puntosConRuta} />
+              </>
+            )}
+            {userLocation && destinoLinea && rutaActual?.error && (
+              <Polyline
+                positions={[[userLocation.lat, userLocation.lng], [destinoLinea.latitud!, destinoLinea.longitud!]]}
+                pathOptions={{ color: '#0f766e', weight: 3, dashArray: '6 8', opacity: 0.85 }}
+              />
+            )}
             {userLocation && (
               <Marker position={[userLocation.lat, userLocation.lng]} icon={iconoPaciente}>
                 <Popup>Tu ubicación</Popup>
@@ -118,11 +166,24 @@ export default function PatientMapInner({
                       <button type="button" className="text-xs font-semibold text-teal-700" onClick={() => onVerPerfil(d.id)}>Ver perfil</button>
                       <button type="button" className="text-xs font-semibold text-teal-700" onClick={() => onReservar(d.id, d.nombre)}>Reservar</button>
                     </div>
+                    <a
+                      href={urlComoLlegar(d, userLocation) ?? undefined}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block pt-1 text-xs font-bold text-teal-700"
+                    >
+                      Cómo llegar →
+                    </a>
                   </div>
                 </Popup>
               </Marker>
             ))}
           </MapContainer>
+        )}
+        {destinoLinea && (rutaReal || cargandoRuta) && (
+          <div className="absolute right-3 top-3 z-[500] rounded-xl bg-white/95 px-3 py-1.5 text-xs font-bold text-slatey-800 shadow-md" aria-live="polite">
+            {rutaReal ? `🚗 ${resumenRuta(rutaReal)}` : 'Calculando ruta…'}
+          </div>
         )}
         <button
           type="button"
@@ -133,6 +194,16 @@ export default function PatientMapInner({
         </button>
       </div>
       {avisoUbicacion && <p className="px-1 text-xs text-slatey-500">{avisoUbicacion}</p>}
+      {destinoLinea && rutaReal && (
+        <p className="px-1 text-xs text-slatey-500">
+          Ruta en auto hasta el más cercano ({destinoLinea.nombre}). «Cómo llegar» abre la navegación paso a paso en Google Maps.
+        </p>
+      )}
+      {destinoLinea && rutaActual?.error && (
+        <p className="px-1 text-xs text-slatey-500">
+          No se pudo calcular la ruta ahora; la línea punteada es solo una referencia en línea recta hasta {destinoLinea.nombre}. «Cómo llegar» abre la ruta en Google Maps.
+        </p>
+      )}
       {sinCoordenadas > 0 && (
         <p className="px-1 text-xs text-slatey-500">
           {sinCoordenadas === 1

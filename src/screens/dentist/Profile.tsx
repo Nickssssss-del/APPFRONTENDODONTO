@@ -374,7 +374,7 @@ export default function Profile() {
           </div>
           <div className="min-w-0">
             <h3 className="text-sm font-bold text-slatey-900 truncate">{user.fullName}</h3>
-            <p className="text-xs text-slatey-500 mt-0.5">{mp.perfil.numeroColegiatura}</p>
+            <p className="text-xs text-slatey-500 mt-0.5">COP {mp.perfil.numeroColegiatura}</p>
             <Badge variant={verif.variant} size="sm" className="mt-2">{verif.label}</Badge>
           </div>
         </div>

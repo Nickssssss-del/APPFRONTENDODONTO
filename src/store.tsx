@@ -4,7 +4,8 @@ import { Capacitor } from '@capacitor/core';
 import { GoogleSignIn } from '@capawesome/capacitor-google-sign-in';
 import { restoreSession, logout as apiLogout, loginConGoogle } from './api/auth';
 import { pantallaVisible } from './lib/acceso';
-import { SESSION_EXPIRED_EVENT } from './api/http';
+import { SESSION_EXPIRED_EVENT, conCopiaOffline } from './api/http';
+import { avisarSinConexion, fijarUsuarioOffline, leerCopia } from './lib/offline';
 import { obtenerYo } from './api/usuarios';
 import { activarPush, desactivarPush } from './lib/push';
 import { agendaOdontologo, cancelarCita, confirmarCita, misCitas, pagarDeposito, reservarCita, type CitaApi, type MetodoPago } from './api/citas';
@@ -208,7 +209,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
    const refreshAppointments = useCallback(async () => {
      if (!isAuthRef.current) return;
      try {
-       const fetched = roleRef.current === 'dentist' ? await agendaOdontologo() : await misCitas();
+       // Sin conexión se muestran las últimas citas guardadas (lib/offline).
+       const fetched = await conCopiaOffline('citas', () => (roleRef.current === 'dentist' ? agendaOdontologo() : misCitas()));
        if (!isAuthRef.current) return; // se cerró la sesión mientras llegaba la respuesta
        setCitas(fetched);
      } catch (e) {
@@ -312,8 +314,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const ok = await restoreSession();
-        if (mounted && ok) setIsAuth(true); // los datos del usuario los carga el efecto de más abajo
+        const r = await restoreSession();
+        if (mounted && r === 'ok') setIsAuth(true); // los datos del usuario los carga el efecto de más abajo
+        // Sin red pero con sesión guardada: abre con los últimos datos del teléfono. Al volver la conexión,
+        // la primera petición recibe 401 y http.ts renueva el token solo.
+        else if (mounted && r === 'sin-red' && leerCopia('perfil')) {
+          avisarSinConexion(null);
+          setIsAuth(true);
+        }
       } catch {
         // sin sesión activa
       } finally {
@@ -337,7 +345,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!isAuth) return;
     let cancelled = false;
 
-    obtenerYo()
+    conCopiaOffline('perfil', obtenerYo, {
+      antesDeGuardar: (yo) => fijarUsuarioOffline(yo.id),
+      sanear: (yo) => ({ ...yo, numeroDocumento: '' }), // el DNI no se guarda en el teléfono
+    })
       .then((yo) => {
         if (cancelled) return;
         setRole(yo.rol === 'ODONTOLOGO' ? 'dentist' : 'patient');

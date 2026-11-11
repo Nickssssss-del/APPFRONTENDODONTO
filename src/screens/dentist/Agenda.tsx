@@ -8,7 +8,7 @@ import { useAsync } from '@/hooks/useAsync';
 import {
   agendaOdontologo, confirmarCita, completarCita, marcarInasistencia, type CitaApi, type EstadoCita,
 } from '@/api/citas';
-import { ApiError } from '@/api/http';
+import { ApiError, conCopiaOffline } from '@/api/http';
 import { diasAgendaOdontologo, rangoAgendaOdontologo, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
 
 type Variante = 'success' | 'primary' | 'warning' | 'error' | 'neutral';
@@ -42,7 +42,8 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
 
   // Ventana de 62 días (ayer → hoy+60), el máximo que acepta el backend. `hasta` es exclusivo.
-  const agenda = useAsync(() => agendaOdontologo(rango.desde, rango.hastaExclusivo), [rango]);
+  // Sin conexión muestra la última agenda guardada (lib/offline).
+  const agenda = useAsync(() => conCopiaOffline('agenda', () => agendaOdontologo(rango.desde, rango.hastaExclusivo)), [rango]);
   const citasDelDia = useMemo(() => {
     const fecha = dias[selectedDateIdx].fecha;
     return (agenda.data ?? [])

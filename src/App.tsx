@@ -23,6 +23,7 @@ import PatientBottomNav from './components/PatientBottomNav';
 import { TourProvider, TourTrigger } from './components/Tour';
 import type { TourConfig } from './components/Tour';
 import type { Screen } from './types';
+import AvisoSinConexion from '@/components/AvisoSinConexion';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -181,6 +182,7 @@ function AppContent() {
       <div className="h-full bg-slatey-100">
         {/* Mobile app container - full width, no sidebar */}
         <div className="flex h-full w-full max-w-md mx-auto flex-col bg-slatey-50 relative shadow-xl">
+          <AvisoSinConexion />
           <ErrorBoundary>
             <AnimatePresence mode="wait">
               <motion.div

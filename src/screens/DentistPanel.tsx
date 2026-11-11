@@ -30,9 +30,9 @@ export default function DentistPanel() {
 
   const cerrarFicha = () => setSelectedPatientId(null);
   const showPatientDetail = selectedPatientId !== null;
-
+  // pb-40: deja espacio para la barra inferior y el botón flotante de OdontoBot, que así no tapa la última tarjeta.
   return (
-    <div className="min-h-screen bg-slatey-50 pb-24">
+    <div className="min-h-screen bg-slatey-50 pb-40">
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
         <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">

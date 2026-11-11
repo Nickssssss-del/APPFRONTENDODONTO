@@ -23,6 +23,8 @@ interface PatientMapProps {
   onVerPerfil: (id: string) => void;
   onReservar: (id: string, nombre: string) => void;
   sinCoordenadas: number;
+  /** Se marca con una línea de referencia desde la ubicación del paciente. */
+  masCercanoId?: string | null;
 }
 
 export default function PatientMap({
@@ -33,6 +35,7 @@ export default function PatientMap({
   onVerPerfil,
   onReservar,
   sinCoordenadas,
+  masCercanoId = null,
 }: PatientMapProps) {
   return (
     <Suspense fallback={<div className="flex h-[38dvh] min-h-[220px] max-h-80 w-full items-center justify-center rounded-2xl bg-slatey-50 text-sm text-slatey-500">Cargando mapa…</div>}>
@@ -44,6 +47,7 @@ export default function PatientMap({
         onVerPerfil={onVerPerfil}
         onReservar={onReservar}
         sinCoordenadas={sinCoordenadas}
+        masCercanoId={masCercanoId}
       />
     </Suspense>
   );
