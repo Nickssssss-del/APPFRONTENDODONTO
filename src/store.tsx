@@ -351,7 +351,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     })
       .then((yo) => {
         if (cancelled) return;
-        setRole(yo.rol === 'ODONTOLOGO' ? 'dentist' : 'patient');
+        const rol: Role = yo.rol === 'ODONTOLOGO' ? 'dentist' : 'patient';
+        // La ref se actualiza ya: refreshAppointments corre en el .finally, antes del siguiente render,
+        // y con la ref vieja pedía /api/citas/mias también para el odontólogo.
+        roleRef.current = rol;
+        setRole(rol);
         setUser((u) => ({
           ...u,
           fullName: yo.nombreCompleto,

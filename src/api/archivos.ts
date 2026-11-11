@@ -7,6 +7,12 @@ export type FotoConsultorio = { id: string; url: string; descripcion?: string; o
 export type DocumentoOdontologo = { id: string; tipo: TipoDocumento; subidoEn: string; urlTemporal: string; urlExpiraEn: string };
 
 const MAX_BYTES = 5 * 1024 * 1024; // el backend rechaza > 5 MB con 413
+/** Tope de lo que se acepta del teléfono ANTES de comprimir (una foto de 48 MP ronda 8-15 MB). */
+const MAX_BYTES_ORIGINAL = 25 * 1024 * 1024;
+/** Por encima de esto se comprime: lado mayor 1920 px, JPEG 85 %. Basta para perfil y galería. */
+const COMPRIMIR_DESDE = 1.5 * 1024 * 1024;
+const LADO_MAXIMO = 1920;
+const CALIDAD_JPEG = 0.85;
 export const IMAGENES_PERMITIDAS = ['image/jpeg', 'image/png', 'image/webp'];
 
 const EXTENSION_A_FORMATO: Record<string, 'jpeg' | 'png' | 'webp'> = {
@@ -60,22 +66,73 @@ async function formatoDe(file: File): Promise<'jpeg' | 'png' | 'webp' | 'heic' |
  */
 export async function validarImagen(file: File): Promise<string | null> {
   if (file.size <= 0) return 'No se pudo leer la imagen seleccionada.';
-  if (file.size > MAX_BYTES) return 'La imagen supera los 5 MB.';
   const formato = await formatoDe(file);
   if (formato === 'heic') return 'HEIC no es compatible. Elige una imagen JPG, PNG o WEBP.';
   if (!formato) return 'Usa una imagen JPG, PNG o WEBP.';
+  // Las fotos grandes se comprimen antes de subir (archivoParaSubir). Sin compresión disponible, el límite es 5 MB.
+  const limite = puedeComprimir() ? MAX_BYTES_ORIGINAL : MAX_BYTES;
+  if (file.size > limite) return `La imagen supera los ${Math.round(limite / 1024 / 1024)} MB.`;
   return null;
 }
 
-/** Copia los bytes a un File con nombre y MIME que el multipart nativo pueda describir. */
+/**
+ * Copia SIEMPRE los bytes a un File en memoria, con nombre y MIME que el multipart nativo pueda describir.
+ * En Android, CapacitorHttp debe leer el archivo para armar el multipart; con el File original del selector
+ * (respaldado por el sistema de archivos) esa lectura puede fallar o enviar la parte vacía.
+ */
 async function archivoParaSubir(file: File): Promise<File> {
   const formato = await formatoDe(file);
-  if (formato !== 'jpeg' && formato !== 'png' && formato !== 'webp') return file;
   const base = (file.name.split(/[/\\]/).pop() ?? '').trim();
+  if (formato !== 'jpeg' && formato !== 'png' && formato !== 'webp') {
+    return new File([await file.arrayBuffer()], base || 'archivo', { type: file.type, lastModified: file.lastModified });
+  }
+  if (file.size > COMPRIMIR_DESDE) {
+    const comprimida = await comprimirImagen(file, base);
+    if (comprimida) return comprimida;
+  }
   const name = EXTENSION_A_FORMATO[extensionDe(base)] ? base : `foto.${EXTENSION[formato]}`;
-  const type = TIPO[formato];
-  if (file.type === type && file.name === name) return file;
-  return new File([await file.arrayBuffer()], name, { type, lastModified: file.lastModified });
+  return new File([await file.arrayBuffer()], name, { type: TIPO[formato], lastModified: file.lastModified });
+}
+
+function puedeComprimir(): boolean {
+  return typeof createImageBitmap === 'function' && typeof document !== 'undefined';
+}
+
+/**
+ * Reduce la foto (lado mayor 1920 px) y la guarda como JPEG 85 %. Devuelve null si el dispositivo no puede
+ * decodificarla o si el resultado no mejora: entonces se sube la original y el backend aplica su límite de 5 MB.
+ */
+export async function comprimirImagen(file: File, nombre = file.name): Promise<File | null> {
+  if (!puedeComprimir()) return null;
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const escala = Math.min(1, LADO_MAXIMO / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.fillStyle = '#ffffff'; // PNG con transparencia → fondo blanco en JPEG
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((ok) => canvas.toBlob(ok, 'image/jpeg', CALIDAD_JPEG));
+    if (!blob || blob.size >= file.size) return null;
+    const base = nombre.replace(/\.[^.]*$/, '') || 'foto';
+    return new File([blob], `${base}.jpg`, { type: 'image/jpeg', lastModified: file.lastModified });
+  } catch {
+    return null;
+  }
+}
+
+/** PDF o imagen para los documentos de verificación (también se copia a memoria). */
+async function documentoParaSubir(file: File): Promise<File> {
+  const cabecera = new Uint8Array(await file.slice(0, 5).arrayBuffer());
+  const esPdf = String.fromCharCode(...cabecera) === '%PDF-';
+  if (!esPdf) return archivoParaSubir(file);
+  const base = (file.name.split(/[/\\]/).pop() ?? '').trim();
+  const name = extensionDe(base) === 'pdf' ? base : 'documento.pdf';
+  return new File([await file.arrayBuffer()], name, { type: 'application/pdf', lastModified: file.lastModified });
 }
 
 export const subirFotoPerfil = async (archivo: File) => {
@@ -99,9 +156,10 @@ export const eliminarFotoConsultorio = (id: string) => api(`/api/odontologos/yo/
 
 export const listarDocumentos = () => api<DocumentoOdontologo[]>('/api/odontologos/yo/documentos');
 
-export const subirDocumento = (tipo: TipoDocumento, archivo: File) => {
+export const subirDocumento = async (tipo: TipoDocumento, archivo: File) => {
+  const listo = await documentoParaSubir(archivo);
   const form = new FormData();
-  form.append('archivo', archivo);
+  form.append('archivo', listo);
   // "tipo" es @RequestParam: va en la query, no en el form.
   return api<DocumentoOdontologo>('/api/odontologos/yo/documentos', { method: 'POST', form, query: { tipo } });
 };

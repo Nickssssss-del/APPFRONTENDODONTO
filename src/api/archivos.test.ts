@@ -36,3 +36,37 @@ describe('validarImagen (firma de bytes)', () => {
     expect(await validarImagen(archivo(JPEG, 'grande.jpg', 'image/jpeg', 5 * 1024 * 1024))).toMatch(/5 MB/);
   });
 });
+
+import { vi } from 'vitest';
+const enviado = vi.hoisted(() => ({ ultimo: null as null | { path: string; form: FormData } }));
+vi.mock('./http', () => ({
+  api: async (path: string, opts: { form: FormData }) => { enviado.ultimo = { path, form: opts.form }; return {}; },
+}));
+import { agregarFotoConsultorio, subirDocumento, subirFotoPerfil } from './archivos';
+
+describe('subida: el archivo viaja copiado en memoria y completo', () => {
+  const original = () => new File([new Uint8Array([...JPEG, 1, 2, 3])], 'IMG_2026.jpg', { type: 'image/jpeg' });
+
+  it.each([
+    ['foto de perfil', () => subirFotoPerfil(original()), '/api/usuarios/yo/foto'],
+    ['galería del consultorio', () => agregarFotoConsultorio(original()), '/api/odontologos/yo/fotos'],
+  ])('%s', async (_n, subir, ruta) => {
+    const f = original();
+    await subir();
+    const parte = enviado.ultimo!.form.get('archivo') as File;
+    expect(enviado.ultimo!.path).toBe(ruta);
+    expect(parte).not.toBe(f);
+    expect(parte.name).toBe('IMG_2026.jpg');
+    expect(parte.type).toBe('image/jpeg');
+    expect(new Uint8Array(await parte.arrayBuffer())).toEqual(new Uint8Array(await f.arrayBuffer()));
+  });
+
+  it('documento PDF sin extensión ni MIME llega como PDF', async () => {
+    const pdf = new File([new TextEncoder().encode('%PDF-1.7 contenido')], '1000099', { type: '' });
+    await subirDocumento('DNI', pdf);
+    const parte = enviado.ultimo!.form.get('archivo') as File;
+    expect(parte.name).toBe('documento.pdf');
+    expect(parte.type).toBe('application/pdf');
+    expect(parte.size).toBe(pdf.size);
+  });
+});

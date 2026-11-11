@@ -132,8 +132,11 @@ export default function Profile() {
 
   // ── fotos ──
   const fotos = useAsync(() => listarFotosConsultorio(), []);
+  // Errores separados: el de la galería se muestra junto a la galería (antes salía arriba, fuera de la vista).
   const [fotoError, setFotoError] = useState<string | null>(null);
+  const [galeriaError, setGaleriaError] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
+  const [subiendoPerfil, setSubiendoPerfil] = useState(false);
   const galeriaInput = useRef<HTMLInputElement>(null);
   const perfilInput = useRef<HTMLInputElement>(null);
   const listaFotos = [...(fotos.data ?? [])].sort((a, b) => a.orden - b.orden);
@@ -143,14 +146,14 @@ export default function Profile() {
     e.target.value = '';
     if (!file) return;
     const err = await validarImagen(file);
-    if (err) return setFotoError(err);
+    if (err) return setGaleriaError(err);
     setSubiendo(true);
-    setFotoError(null);
+    setGaleriaError(null);
     try {
       await agregarFotoConsultorio(file);
       fotos.reload();
     } catch (error) {
-      setFotoError(msg(error, 'No se pudo subir la foto.'));
+      setGaleriaError(msg(error, 'No se pudo subir la foto.'));
     } finally {
       setSubiendo(false);
     }
@@ -160,7 +163,7 @@ export default function Profile() {
       await eliminarFotoConsultorio(id);
       fotos.reload();
     } catch (error) {
-      setFotoError(msg(error, 'No se pudo eliminar la foto.'));
+      setGaleriaError(msg(error, 'No se pudo eliminar la foto.'));
     }
   };
   const cambiarFotoPerfil = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -169,12 +172,15 @@ export default function Profile() {
     if (!file) return;
     const err = await validarImagen(file);
     if (err) return setFotoError(err);
+    setSubiendoPerfil(true);
     try {
       const r = await subirFotoPerfil(file);
       setUser({ ...user, photoUrl: r.fotoPerfilUrl });
       setFotoError(null);
     } catch (error) {
       setFotoError(msg(error, 'No se pudo cambiar la foto de perfil.'));
+    } finally {
+      setSubiendoPerfil(false);
     }
   };
 
@@ -368,8 +374,8 @@ export default function Profile() {
           <div className="relative">
             <SmartImage src={user.photoUrl} alt={user.fullName || 'Foto de perfil'} ratio="1/1" fallback="avatar" gravity="face" widths={[160, 320]} sizes="80px" className="w-20 h-20 rounded-2xl" />
             <input ref={perfilInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={cambiarFotoPerfil} />
-            <button onClick={() => perfilInput.current?.click()} aria-label="Cambiar foto de perfil" className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-primary-500 flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors">
-              <Camera className="w-4 h-4 text-white" />
+            <button onClick={() => perfilInput.current?.click()} disabled={subiendoPerfil} aria-label="Cambiar foto de perfil" className="absolute -bottom-1 -right-1 w-8 h-8 rounded-xl bg-primary-500 flex items-center justify-center shadow-md hover:bg-primary-600 transition-colors disabled:opacity-70">
+              {subiendoPerfil ? <Loader2 className="w-4 h-4 text-white animate-spin" aria-label="Subiendo foto" /> : <Camera className="w-4 h-4 text-white" />}
             </button>
           </div>
           <div className="min-w-0">
@@ -522,6 +528,8 @@ export default function Profile() {
           </button>
         </div>
         {fotos.error && <p role="alert" className="text-xs text-error-600">{fotos.error}</p>}
+        {galeriaError && <p role="alert" className="text-xs font-medium text-error-600">{galeriaError}</p>}
+        {listaFotos.length >= 10 && <p className="text-xs text-slatey-500">Llegaste al máximo de 10 fotos. Elimina una para subir otra.</p>}
       </Seccion>
 
       {/* Horarios */}

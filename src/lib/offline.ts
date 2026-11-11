@@ -10,8 +10,8 @@ const PREFIJO = 'odonto_offline:v1:';
 const CLAVE_USUARIO = `${PREFIJO}usuario`;
 
 /** Únicas consultas que pueden guardarse. */
-export type RecursoOffline = 'perfil' | 'citas' | 'agenda';
-const RECURSOS: readonly RecursoOffline[] = ['perfil', 'citas', 'agenda'];
+export type RecursoOffline = 'perfil' | 'citas' | 'agenda' | 'agenda-inicio';
+const RECURSOS: readonly RecursoOffline[] = ['perfil', 'citas', 'agenda', 'agenda-inicio'];
 
 type Copia<T> = { guardadoEn: number; datos: T };
 
