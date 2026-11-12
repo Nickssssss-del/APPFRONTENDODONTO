@@ -1,4 +1,4 @@
-import { api, clearTokens, getRefreshToken, refreshSessionNow, setTokens, ApiError } from './http';
+import { api, clearTokens, getRefreshToken, inicializarTokens, refreshSessionNow, setTokens, ApiError } from './http';
 
 export type Rol = 'PACIENTE' | 'ODONTOLOGO';
 
@@ -92,9 +92,15 @@ export async function registroConGoogle(
 }
 
 /** Al abrir la app: si hay refresh token guardado, lo canjea. true = la sesión sigue vigente. */
-export async function restoreSession(): Promise<boolean> {
-  if (!getRefreshToken()) return false;
-  return refreshSessionNow();
+/**
+ * ok: sesión renovada · sin-sesion: no hay token o el servidor lo rechazó ·
+ * sin-red: hay token pero no se pudo contactar al servidor (la app puede abrir en modo sin conexión).
+ */
+export async function restoreSession(): Promise<'ok' | 'sin-sesion' | 'sin-red'> {
+  await inicializarTokens();
+  if (!getRefreshToken()) return 'sin-sesion';
+  const r = await refreshSessionNow();
+  return r === 'ok' ? 'ok' : r === 'sin-red' ? 'sin-red' : 'sin-sesion';
 }
 
 /**

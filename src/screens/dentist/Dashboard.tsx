@@ -7,7 +7,7 @@ import {
 import { useApp } from '@/storeHooks';
 import { Badge, Button } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
-import { ApiError } from '@/api/http';
+import { ApiError, conCopiaOffline } from '@/api/http';
 import { agendaOdontologo, completarCita, marcarInasistencia, type CitaApi } from '@/api/citas';
 import { agendaHoy, confirmarAgendaHoy, misIngresos } from '@/api/panel';
 import { fechaIsoLima, horaLima, diaLima, soles, sumarDias, ETIQUETA_ESTADO } from '@/lib/format';
@@ -64,7 +64,8 @@ export default function Dashboard({ dentistName, onGoToAgenda, onGoToPatient }: 
   const hoy = useMemo(() => fechaIsoLima(new Date()), []);
 
   // `hasta` es exclusivo del backend.
-  const agenda = useAsync(() => agendaOdontologo(hoy, sumarDias(hoy, DIAS_AGENDA)), [hoy]);
+  // Sin conexión muestra la última copia guardada (lib/offline).
+  const agenda = useAsync(() => conCopiaOffline('agenda-inicio', () => agendaOdontologo(hoy, sumarDias(hoy, DIAS_AGENDA))), [hoy]);
   const ingresos = useAsync(() => misIngresos(), []);
   const estadoHoy = useAsync(() => agendaHoy(), []);
 

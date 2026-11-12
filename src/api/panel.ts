@@ -111,12 +111,22 @@ export type PacienteResumen = {
   proximaCita?: string | null;
 };
 
+/** GET /api/pacientes/{id} (PacienteService.PacienteDetalle en el backend). */
 export type PacienteDetalle = {
   id: string;
   nombre: string;
   apellido: string;
+  nombreCompleto?: string | null;
+  correo?: string | null;
+  telefono?: string | null;
   alergias?: string | null;
   antecedentes?: string | null;
+  totalCitas?: number;
+  /** Citas COMPLETADAS de este paciente con el odontólogo que consulta. */
+  citasAtendidas?: number;
+  inasistencias?: number;
+  ultimaAtencion?: string | null;
+  proximaCita?: string | null;
 };
 
 export const misPacientes = (signal?: AbortSignal) =>

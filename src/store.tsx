@@ -3,7 +3,9 @@ import type { Role, Screen, Treatment, Reservation, UserProfile, DentistTab, App
 import { Capacitor } from '@capacitor/core';
 import { GoogleSignIn } from '@capawesome/capacitor-google-sign-in';
 import { restoreSession, logout as apiLogout, loginConGoogle } from './api/auth';
-import { SESSION_EXPIRED_EVENT } from './api/http';
+import { pantallaVisible } from './lib/acceso';
+import { SESSION_EXPIRED_EVENT, conCopiaOffline } from './api/http';
+import { avisarSinConexion, fijarUsuarioOffline, leerCopia } from './lib/offline';
 import { obtenerYo } from './api/usuarios';
 import { activarPush, desactivarPush } from './lib/push';
 import { agendaOdontologo, cancelarCita, confirmarCita, misCitas, pagarDeposito, reservarCita, type CitaApi, type MetodoPago } from './api/citas';
@@ -152,8 +154,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Refs para que los callbacks estables vean siempre el rol y la sesión actuales.
   const isAuthRef = useRef(false);
   const roleRef = useRef<Role>('patient');
+  const perfilListoRef = useRef(false);
+  const sessionLoadingRef = useRef(true);
   isAuthRef.current = isAuth;
   roleRef.current = role;
+  perfilListoRef.current = perfilListo;
+  sessionLoadingRef.current = sessionLoading;
 
   const logout = useCallback(() => {
     // Quita el token push de este celular. La petición sale con el access token actual (se lee al instante,
@@ -181,14 +187,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Cualquier salto a "onboarding" con sesión abierta (p. ej. "Cerrar sesión" en Ajustes) cierra la sesión de verdad.
   const setScreen = useCallback((s: Screen) => {
-    if (s === 'onboarding' && isAuthRef.current) logout();
-    setScreenRaw(s);
+    if (s === 'onboarding' && isAuthRef.current) {
+      logout();
+      setScreenRaw('onboarding');
+      return;
+    }
+    // Sin sesión confirmada no se reescribe el destino: el login aún no actualizó el rol.
+    // App.tsx evita pintar la pantalla si, ya con el rol, no corresponde.
+    if (!isAuthRef.current || !perfilListoRef.current || sessionLoadingRef.current) {
+      setScreenRaw(s);
+      return;
+    }
+    setScreenRaw(pantallaVisible(s, {
+      sessionLoading: false,
+      isAuth: true,
+      perfilListo: true,
+      role: roleRef.current,
+    }));
   }, [logout]);
 
    const refreshAppointments = useCallback(async () => {
      if (!isAuthRef.current) return;
      try {
-       const fetched = roleRef.current === 'dentist' ? await agendaOdontologo() : await misCitas();
+       // Sin conexión se muestran las últimas citas guardadas (lib/offline).
+       const fetched = await conCopiaOffline('citas', () => (roleRef.current === 'dentist' ? agendaOdontologo() : misCitas()));
        if (!isAuthRef.current) return; // se cerró la sesión mientras llegaba la respuesta
        setCitas(fetched);
      } catch (e) {
@@ -292,8 +314,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        const ok = await restoreSession();
-        if (mounted && ok) setIsAuth(true); // los datos del usuario los carga el efecto de más abajo
+        const r = await restoreSession();
+        if (mounted && r === 'ok') setIsAuth(true); // los datos del usuario los carga el efecto de más abajo
+        // Sin red pero con sesión guardada: abre con los últimos datos del teléfono. Al volver la conexión,
+        // la primera petición recibe 401 y http.ts renueva el token solo.
+        else if (mounted && r === 'sin-red' && leerCopia('perfil')) {
+          avisarSinConexion(null);
+          setIsAuth(true);
+        }
       } catch {
         // sin sesión activa
       } finally {
@@ -317,10 +345,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!isAuth) return;
     let cancelled = false;
 
-    obtenerYo()
+    conCopiaOffline('perfil', obtenerYo, {
+      antesDeGuardar: (yo) => fijarUsuarioOffline(yo.id),
+      sanear: (yo) => ({ ...yo, numeroDocumento: '' }), // el DNI no se guarda en el teléfono
+    })
       .then((yo) => {
         if (cancelled) return;
-        setRole(yo.rol === 'ODONTOLOGO' ? 'dentist' : 'patient');
+        const rol: Role = yo.rol === 'ODONTOLOGO' ? 'dentist' : 'patient';
+        // La ref se actualiza ya: refreshAppointments corre en el .finally, antes del siguiente render,
+        // y con la ref vieja pedía /api/citas/mias también para el odontólogo.
+        roleRef.current = rol;
+        setRole(rol);
         setUser((u) => ({
           ...u,
           fullName: yo.nombreCompleto,

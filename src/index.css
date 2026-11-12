@@ -83,3 +83,15 @@ input[type="checkbox"], input[type="radio"] {
   background-color: #0E9488;
   color: white;
 }
+
+/* Ruta al consultorio más cercano: trazo que fluye hacia el destino (PatientMapInner). */
+.ruta-animada {
+  stroke-dasharray: 10 14;
+  animation: ruta-flujo 1.1s linear infinite;
+}
+@keyframes ruta-flujo {
+  to { stroke-dashoffset: -24; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ruta-animada { animation: none; stroke-dasharray: none; }
+}
