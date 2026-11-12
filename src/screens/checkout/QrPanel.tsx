@@ -11,6 +11,11 @@ interface Props {
   payState: PayState;
 }
 
+const QR_IMAGEN: Record<Exclude<PayMethod, 'card'>, string> = {
+  yape: 'yapeqr.png',
+  plin: 'plin-qr.png',
+};
+
 const STEPS: Record<Exclude<PayMethod, 'card'>, string[]> = {
   yape: [
     'Abre Yape en tu celular',
@@ -60,23 +65,18 @@ export function QrPanel({ method, guarantee, operationNumber, onOperationNumberC
   );
 
   const appName = method === 'yape' ? 'Yape' : 'Plin';
-  const accent = method === 'yape' ? 'bg-[#6B21A8]' : 'bg-[#1D7D3A]';
-  const letter = method === 'yape' ? 'Y' : 'P';
 
   return (
     <div className="bg-white rounded-2xl border border-slatey-100 p-4 space-y-4">
-      {/* QR placeholder */}
+      {/* QR de cobro (imágenes en public/pagos) */}
       <div className="flex flex-col items-center">
-        <div className="w-44 h-44 bg-slatey-900 rounded-2xl p-3 mb-3 relative overflow-hidden select-none">
-          {/* Ilustración del QR: en modo simulado no hay QR real que escanear */}
-          <QrPixels />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-xl bg-white p-1.5">
-            <div
-              className={`w-full h-full rounded-md ${accent} flex items-center justify-center text-white text-lg font-black`}
-            >
-              {letter}
-            </div>
-          </div>
+        <div className="w-56 rounded-2xl border border-slatey-100 bg-white p-2 mb-3 overflow-hidden shadow-xs">
+          <img
+            src={`${import.meta.env.BASE_URL}pagos/${QR_IMAGEN[method]}`}
+            alt={`Código QR de ${method === 'yape' ? 'Yape' : 'Plin'} para pagar S/ ${guarantee.toFixed(2)}`}
+            className="w-full h-auto max-h-64 object-contain select-none"
+            draggable={false}
+          />
         </div>
         <p className="text-xs text-slatey-500 text-center">
           Escanea con <strong>{appName}</strong> · S/{' '}
@@ -155,21 +155,3 @@ export function QrPanel({ method, guarantee, operationNumber, onOperationNumberC
     </div>
   );
 }
-
-/** QR ilustrativo (determinista) mientras el modo de pagos sea simulado. */
-function QrPixels() {
-  // Seeded so it doesn't re-render on every keystroke
-  const cells = Array.from({ length: 64 }, (_, i) => ((i * 3 + 7) % 11) > 4);
-  return (
-    <div className="w-full h-full grid grid-cols-8 gap-0.5">
-      {cells.map((on, i) => (
-        <div
-          key={i}
-          className="rounded-[2px]"
-          style={{ background: on ? 'white' : '#0F172A' }}
-        />
-      ))}
-    </div>
-  );
-}
-

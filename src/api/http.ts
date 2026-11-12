@@ -8,39 +8,48 @@
  *  - Errores llegan como { timestamp, status, error, mensaje, path }.
  */
 
+import { borrarRefresh, guardarRefresh, leerRefreshGuardado } from '@/lib/almacenSeguro';
+import {
+  avisarConexionRecuperada, avisarSinConexion, borrarDatosOffline, guardarCopia, leerCopia, type RecursoOffline,
+} from '@/lib/offline';
+
 export const API_URL: string = (import.meta.env.VITE_API_URL ?? 'http://localhost:8080').replace(/\/$/, '');
 
-const REFRESH_KEY = 'odonto_refresh_token';
 export const SESSION_EXPIRED_EVENT = 'odonto:session-expired';
 
 /* ───────── tokens ───────── */
 // El access token vive solo en memoria (se pierde al recargar y se recupera con el refresh).
-// El refresh token va en localStorage: es cómodo, pero un XSS podría leerlo; mantén la CSP estricta
-// y no renderices HTML de terceros sin sanitizar.
+// El refresh token se guarda cifrado en Android (lib/almacenSeguro) y se refleja en memoria para leerlo al instante.
 let accessToken: string | null = null;
+let refreshToken: string | null = null;
+let tokensCargados: Promise<void> | null = null;
+// Las escrituras al almacén van en cola: el refresh token rota y el último valor debe ganar.
+let colaAlmacen: Promise<unknown> = Promise.resolve();
+const enCola = (tarea: () => Promise<void>) => {
+  colaAlmacen = colaAlmacen.then(tarea).catch(() => undefined);
+};
+
+/** Carga el refresh token guardado (una sola vez por arranque). */
+export function inicializarTokens(): Promise<void> {
+  tokensCargados ??= leerRefreshGuardado()
+    .then((t) => { refreshToken ??= t; })
+    .catch(() => undefined);
+  return tokensCargados;
+}
 
 export function setTokens(access: string, refresh: string) {
   accessToken = access;
-  try {
-    localStorage.setItem(REFRESH_KEY, refresh);
-  } catch {
-    /* modo privado: la sesión durará hasta recargar */
-  }
+  refreshToken = refresh;
+  enCola(() => guardarRefresh(refresh));
 }
 export function getRefreshToken(): string | null {
-  try {
-    return localStorage.getItem(REFRESH_KEY);
-  } catch {
-    return null;
-  }
+  return refreshToken;
 }
 export function clearTokens() {
   accessToken = null;
-  try {
-    localStorage.removeItem(REFRESH_KEY);
-  } catch {
-    /* noop */
-  }
+  refreshToken = null;
+  enCola(() => borrarRefresh());
+  borrarDatosOffline(); // las copias sin conexión son de esta sesión
 }
 
 /* ───────── snake_case <-> camelCase ───────── */
@@ -78,6 +87,7 @@ const NETWORK_RETRY_AFTER_MS = 5000;
 function markNetworkSuccess() {
   consecutiveNetworkErrors = 0;
   networkDown = false;
+  avisarConexionRecuperada();
 }
 
 /** true solo mientras estamos en modo offline y aún no toca reintentar. */
@@ -101,26 +111,30 @@ function markNetworkError() {
 }
 
 /* ───────── refresh con "single flight" ───────── */
-let refreshing: Promise<boolean> | null = null;
+/** ok: hay access token nuevo · rechazado: el servidor no aceptó el refresh · sin-red: no se pudo preguntar. */
+export type ResultadoRefresh = 'ok' | 'rechazado' | 'sin-red';
+let refreshing: Promise<ResultadoRefresh> | null = null;
 
-async function tryRefresh(): Promise<boolean> {
+async function tryRefresh(): Promise<ResultadoRefresh> {
   if (refreshing) return refreshing; // varias peticiones con 401 comparten UN solo refresh (el token se rota)
+  await inicializarTokens();
   const refresh = getRefreshToken();
-  if (!refresh) return false;
+  if (!refresh) return 'rechazado';
 
-  refreshing = (async () => {
+  refreshing = (async (): Promise<ResultadoRefresh> => {
     try {
       const res = await fetch(`${API_URL}/api/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refresh }),
       });
-      if (!res.ok) return false;
+      if (!res.ok) return 'rechazado';
       const data = camelize<{ accessToken: string; refreshToken: string }>(await res.json());
       setTokens(data.accessToken, data.refreshToken);
-      return true;
+      markNetworkSuccess();
+      return 'ok';
     } catch {
-      return false;
+      return 'sin-red';
     } finally {
       refreshing = null;
     }
@@ -129,7 +143,7 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 /** Restaura la sesión al abrir la app usando el refresh token guardado. */
-export async function refreshSessionNow(): Promise<boolean> {
+export async function refreshSessionNow(): Promise<ResultadoRefresh> {
   return tryRefresh();
 }
 
@@ -179,7 +193,7 @@ export async function api<T = void>(path: string, opts: RequestOptions = {}): Pr
   let res: Response;
   try {
     res = await doFetch();
-    if (res.status === 401 && auth && (await tryRefresh())) res = await doFetch();
+    if (res.status === 401 && auth && (await tryRefresh()) === 'ok') res = await doFetch();
   } catch (e) {
     if ((e as Error).name === 'AbortError') throw e;
     markNetworkError();
@@ -209,6 +223,29 @@ export async function api<T = void>(path: string, opts: RequestOptions = {}): Pr
   const texto = await res.text();
   if (!texto) return undefined as T;
   return camelize<T>(JSON.parse(texto));
+}
+
+/**
+ * Consulta de solo lectura con copia para el modo sin conexión (ver lib/offline).
+ * Con conexión: guarda la respuesta. Sin conexión (ApiError 0): devuelve la última copia y lo avisa a la interfaz.
+ */
+export async function conCopiaOffline<T>(
+  recurso: RecursoOffline,
+  consulta: () => Promise<T>,
+  opciones: { sanear?: (datos: T) => T; antesDeGuardar?: (datos: T) => void } = {},
+): Promise<T> {
+  try {
+    const datos = await consulta();
+    opciones.antesDeGuardar?.(datos);
+    guardarCopia(recurso, opciones.sanear ? opciones.sanear(datos) : datos);
+    return datos;
+  } catch (e) {
+    if (!(e instanceof ApiError) || e.status !== 0) throw e;
+    const copia = leerCopia<T>(recurso);
+    if (!copia) throw e;
+    avisarSinConexion(copia.guardadoEn);
+    return copia.datos;
+  }
 }
 
 /**

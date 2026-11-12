@@ -14,8 +14,13 @@ import { apelarInasistencia, miReputacion } from '../api/panel';
 import { diaLima, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '../lib/format';
 import type { CitaApi } from '../api/citas';
 import PatientMap, { type EstadoUbicacion, type PinOdontologo } from '@/components/PatientMap';
+import { urlComoLlegar } from '@/lib/rutas';
 
 const PLAZO_APELACION_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Cuántos odontólogos se muestran y en qué radio se buscan (el backend acepta hasta 100 km). */
+const CANTIDAD_CERCANOS = 5;
+const RADIO_CERCANOS_KM = 100;
 
 export default function PatientDashboard() {
   const { setScreen, setSettingsOpen, user, setSelectedDentistId, setSelectedDentistName, citas, refreshAppointments } = useApp();
@@ -43,7 +48,12 @@ export default function PatientDashboard() {
   const listoParaBuscar = ubicacion !== 'cargando';
   const cercanos = useAsync(
     (signal) => (listoParaBuscar
-      ? buscarOdontologos({ lat: coords?.lat, lng: coords?.lng, tamano: 8 }, signal)
+      ? buscarOdontologos(
+        coords
+          ? { lat: coords.lat, lng: coords.lng, radioKm: RADIO_CERCANOS_KM, orden: 'distancia', tamano: CANTIDAD_CERCANOS }
+          : { tamano: CANTIDAD_CERCANOS },
+        signal,
+      )
       : Promise.resolve(null)),
     [listoParaBuscar, coords?.lat, coords?.lng],
   );
@@ -126,6 +136,12 @@ export default function PatientDashboard() {
   const limite = reputacion.data?.limiteStrikes ?? 3;
   const estadoRep = reputacion.data?.estado;
   const lista = cercanos.data?.contenido ?? [];
+  // El backend ya los ordena por distancia: el primero es el más cercano (solo si hay ubicación).
+  const masCercano = coords && lista[0]?.distanciaKm != null ? lista[0] : null;
+  const fichaMasCercano = masCercano ? (fichasMapa.data ?? []).find((f) => f.id === masCercano.id) : undefined;
+  const rutaMasCercano = masCercano
+    ? urlComoLlegar({ consultorio: masCercano.consultorio, distrito: masCercano.distrito, ...fichaMasCercano }, coords)
+    : null;
 
   return (
     <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
@@ -202,6 +218,7 @@ export default function PatientDashboard() {
             onCentrar={pedirUbicacion}
             onVerPerfil={(id) => { setSelectedDentistId(id); setScreen('dentistProfile'); }}
             onReservar={(id, nombre) => { setSelectedDentistId(id); setSelectedDentistName(nombre); setScreen('marketplace'); }}
+            masCercanoId={masCercano?.id ?? null}
             sinCoordenadas={(fichasMapa.data ?? []).filter((d) => {
               const lat = d.latitud;
               const lng = d.longitud;
@@ -213,7 +230,7 @@ export default function PatientDashboard() {
         {/* Odontólogos (reales) */}
         <div>
           <div className="flex items-center justify-between mb-3 px-1">
-            <h3 className="text-sm font-bold text-slatey-900">{coords ? 'Odontólogos cerca de ti' : 'Odontólogos destacados'}</h3>
+            <h3 className="text-sm font-bold text-slatey-900">{coords ? `Los ${CANTIDAD_CERCANOS} más cercanos a ti` : 'Odontólogos destacados'}</h3>
             <button onClick={() => { setSelectedDentistId(null); setScreen('marketplace'); }} className="text-xs font-semibold text-primary-600 hover:underline">Ver todos</button>
           </div>
           {(cercanos.loading || ubicacion === 'cargando') && <div className="flex justify-center py-6"><Loader2 className="w-5 h-5 text-primary-500 animate-spin" aria-label="Buscando odontólogos" /></div>}
@@ -225,12 +242,21 @@ export default function PatientDashboard() {
           )}
           {!cercanos.loading && !cercanos.error && listoParaBuscar && lista.length === 0 && (
             <div className="rounded-2xl border border-dashed border-slatey-200 bg-white p-5 text-center">
-              <p className="text-xs text-slatey-500">{coords ? 'No hay odontólogos verificados en 10 km a tu alrededor.' : 'Aún no hay odontólogos verificados disponibles.'}</p>
+              <p className="text-xs text-slatey-500">{coords ? `No hay odontólogos verificados en ${RADIO_CERCANOS_KM} km a tu alrededor.` : 'Aún no hay odontólogos verificados disponibles.'}</p>
             </div>
           )}
           <div className="space-y-3">
-            {lista.map((o) => (
-              <div key={o.id} className="bg-white rounded-2xl border border-slatey-100 p-3 flex items-center gap-3">
+            {lista.map((o) => {
+              const esMasCercano = o.id === masCercano?.id;
+              return (
+              <div
+                key={o.id}
+                className={`bg-white rounded-2xl p-3 ${esMasCercano ? 'border-2 border-primary-300 shadow-sm shadow-primary-500/10' : 'border border-slatey-100'}`}
+              >
+              {esMasCercano && (
+                <Badge variant="primary" size="sm" className="mb-2"><Navigation className="w-3 h-3" /> Más cercano</Badge>
+              )}
+              <div className="flex items-center gap-3">
                 <SmartImage src={o.fotoUrl} alt={o.nombre} ratio="1/1" fallback="avatar" gravity="face" widths={[96, 192]} sizes="56px" className="w-14 h-14 rounded-2xl flex-shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slatey-900 truncate">{o.nombre}</p>
@@ -243,7 +269,19 @@ export default function PatientDashboard() {
                 </div>
                 <Button size="sm" variant="outline" onClick={() => { setSelectedDentistId(o.id); setScreen('dentistProfile'); }}>Ver</Button>
               </div>
-            ))}
+              {esMasCercano && rutaMasCercano && (
+                <a
+                  href={rutaMasCercano}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-primary-500 px-3 text-sm font-bold text-white hover:bg-primary-600"
+                >
+                  <Navigation className="w-4 h-4" /> Cómo llegar
+                </a>
+              )}
+              </div>
+              );
+            })}
           </div>
         </div>
 
