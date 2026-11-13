@@ -99,7 +99,7 @@ export default function PatientNotifications() {
   return (
     <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
       <div className="sticky top-0 z-30 border-b border-slatey-100 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto max-w-md px-4 py-3 flex items-start justify-between gap-3">
+        <div className="mx-auto max-w-md horizontal:max-w-3xl px-4 py-3 horizontal:py-1.5 flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold text-slatey-900 font-display">Notificaciones</h2>
             <p className="text-xs text-slatey-500">{user.fullName || 'Paciente'} · Lo que necesita tu atención</p>
@@ -115,7 +115,7 @@ export default function PatientNotifications() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-md space-y-4 px-4 py-5">
+      <div className="mx-auto max-w-md horizontal:max-w-3xl space-y-4 px-4 py-5">
         {bandeja.loading && <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-primary-500" aria-label="Cargando notificaciones" /></div>}
         {bandeja.error && <div role="alert" className="rounded-2xl border border-error-100 bg-error-50 p-4 text-sm text-error-700">{bandeja.error}<Button size="sm" variant="outline" className="mt-3" onClick={bandeja.reload}>Reintentar</Button></div>}
         {errorAccion && <p role="alert" className="text-xs font-medium text-error-600">{errorAccion}</p>}

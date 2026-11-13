@@ -38,7 +38,7 @@ export default function ConfirmarCita() {
     <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
-        <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
+        <div className="flex items-center justify-between px-4 py-3 horizontal:py-1.5 max-w-md horizontal:max-w-3xl mx-auto">
           <div className="flex items-center gap-3">
             <button onClick={handleBack} aria-label="Volver" className="p-2.5 -ml-2 rounded-xl hover:bg-slatey-100">
               <ArrowLeft className="w-5 h-5 text-slatey-700" aria-hidden="true" />
@@ -50,7 +50,7 @@ export default function ConfirmarCita() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-6">
+      <div className="max-w-md horizontal:max-w-3xl mx-auto px-4 py-6">
         {/* Appointment Summary */}
         <div className="bg-white rounded-2xl p-5 border border-slatey-100">
           <div className="flex items-center gap-4 mb-4">

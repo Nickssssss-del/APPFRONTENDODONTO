@@ -138,7 +138,7 @@ export default function Marketplace() {
     return (
       <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
         <div className="sticky top-0 z-30 glass border-b border-slatey-100">
-          <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
+          <div className="flex items-center justify-between px-4 py-3 horizontal:py-1.5 max-w-md horizontal:max-w-3xl mx-auto">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setScreen(role === 'patient' ? 'patientDashboard' : 'dentistPanel')}
@@ -156,7 +156,7 @@ export default function Marketplace() {
           </div>
         </div>
 
-        <div className="max-w-md mx-auto px-4 pt-4">
+        <div className="max-w-md horizontal:max-w-3xl mx-auto px-4 pt-4">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slatey-400" />
             <input
@@ -170,7 +170,7 @@ export default function Marketplace() {
           </div>
         </div>
 
-        <div className="max-w-md mx-auto px-4 py-5 space-y-3">
+        <div className="max-w-md horizontal:max-w-3xl mx-auto px-4 py-5 space-y-3">
           {lista.loading && (
             <div className="flex items-center justify-center gap-2 py-10 text-slatey-500 text-sm">
               <Loader2 className="w-5 h-5 animate-spin" /> Cargando odontólogos…

@@ -33,7 +33,7 @@ export function ProfileHeader({ user, avatarUrl, onAvatarChange }: Props) {
 
   return (
     <div className="bg-white border-b border-slatey-100">
-      <div className="max-w-md mx-auto px-4 py-6">
+      <div className="max-w-md horizontal:max-w-3xl mx-auto px-4 py-6">
         <div className="flex items-center gap-4">
           {/* Avatar with change button */}
           <div className="relative flex-shrink-0">

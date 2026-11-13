@@ -59,7 +59,7 @@ export default function Patients({ onGoToPatient }: PatientsProps) {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-3 horizontal:grid horizontal:grid-cols-2 horizontal:items-start horizontal:gap-3 horizontal:space-y-0">
         {visibles.map((p, i) => {
           return (
             <motion.div

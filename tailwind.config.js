@@ -3,6 +3,10 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      // OBS-10 ampliado: celular en horizontal (más ancho que alto y con poca altura). Tablets y escritorio no entran.
+      screens: {
+        horizontal: { raw: '(orientation: landscape) and (max-height: 600px)' },
+      },
       colors: {
         primary: {
           50: '#F0FDFA',

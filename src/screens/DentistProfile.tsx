@@ -22,7 +22,7 @@ export default function DentistProfile() {
   return (
     <div className="min-h-screen bg-slatey-50 pb-24">
       <div className="sticky top-0 z-30 glass border-b border-slatey-100">
-        <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
+        <div className="flex items-center gap-3 px-4 py-3 horizontal:py-1.5 max-w-md horizontal:max-w-3xl mx-auto">
           <button onClick={volver} aria-label="Volver" className="w-10 h-10 rounded-2xl bg-primary-50 flex items-center justify-center hover:bg-primary-100 transition-colors">
             <ArrowLeft className="w-5 h-5 text-primary-600" />
           </button>
@@ -38,7 +38,7 @@ export default function DentistProfile() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-6 space-y-7">
+      <div className="max-w-md horizontal:max-w-3xl mx-auto px-4 py-6 space-y-7">
         {perfil.loading && <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 text-primary-500 animate-spin" aria-label="Cargando perfil" /></div>}
         {perfil.error && (
           <div role="alert" className="flex flex-col items-center gap-3 rounded-2xl border border-slatey-100 bg-white p-8 text-center">

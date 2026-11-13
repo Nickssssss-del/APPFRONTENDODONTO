@@ -137,7 +137,7 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
 
       {/* Appointment Cards */}
       {!agenda.loading && !agenda.error && (
-        <div className="space-y-3">
+        <div className="space-y-3 horizontal:grid horizontal:grid-cols-2 horizontal:items-start horizontal:gap-3 horizontal:space-y-0">
           {citasDelDia.map((c, i) => {
             const isExpanded = expandedId === c.id;
             const status = statusConfig[c.estado];

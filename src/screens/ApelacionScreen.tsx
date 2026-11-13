@@ -47,7 +47,7 @@ export default function ApelacionScreen() {
   return (
     <div className="min-h-screen bg-slatey-50 pb-24">
       <div className="sticky top-0 z-30 border-b border-slatey-100 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto max-w-md px-4 py-3 flex items-center gap-3">
+        <div className="mx-auto max-w-md horizontal:max-w-3xl px-4 py-3 horizontal:py-1.5 flex items-center gap-3">
           <button onClick={volver} aria-label="Volver" className="p-2 -ml-2 rounded-xl hover:bg-slatey-100">
             <ArrowLeft className="w-5 h-5 text-slatey-700" />
           </button>
@@ -55,7 +55,7 @@ export default function ApelacionScreen() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-md px-4 py-5 space-y-5">
+      <div className="mx-auto max-w-md horizontal:max-w-3xl px-4 py-5 space-y-5">
         {!exito ? (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
             <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">

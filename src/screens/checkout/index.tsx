@@ -255,7 +255,7 @@ export default function CheckoutScreen() {
       <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slatey-50">
         {/* ── Top bar ─────────────────────────────────────────────────────────── */}
         <div className="sticky top-0 z-30 glass border-b border-slatey-100 flex-shrink-0">
-          <div className="flex items-center gap-3 px-4 py-3 max-w-md mx-auto">
+          <div className="flex items-center gap-3 px-4 py-3 horizontal:py-1.5 max-w-md horizontal:max-w-3xl mx-auto">
             <button
               onClick={() => setScreen(activeCita ? 'misCitas' : 'marketplace')}
               aria-label="Volver"
@@ -274,7 +274,7 @@ export default function CheckoutScreen() {
 
         {/* ── Scrollable content ───────────────────────────────────────────────── */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-hide">
-          <div className="mx-auto max-w-md space-y-4 px-4 py-5 pb-6">
+          <div className="mx-auto max-w-md horizontal:max-w-3xl space-y-4 px-4 py-5 pb-6">
             {/* Appointment summary (collapsible) */}
             <AppointmentSummary
               treatment={selectedTreatment}
@@ -356,7 +356,7 @@ export default function CheckoutScreen() {
 
         {/* ── Sticky CTA bar ───────────────────────────────────────────────────── */}
         <div className="flex-shrink-0 border-t border-slatey-100 bg-white/95 px-4 py-3 backdrop-blur-sm safe-area-bottom">
-          <div className="max-w-md mx-auto">
+          <div className="max-w-md horizontal:max-w-3xl mx-auto">
             {payState === 'rejected' && (
               <p className="text-xs text-error-600 font-semibold text-center mb-2" role="alert">
                 {errorMsg ?? 'El pago fue rechazado. Reintenta o elige otro método.'}
