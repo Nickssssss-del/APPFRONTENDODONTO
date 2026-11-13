@@ -9,7 +9,7 @@ import { useApp } from '@/storeHooks';
 import { Badge, Button, Modal } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import { misCitas, cancelarCita, type CitaApi, type EstadoCita } from '@/api/citas';
-import { ApiError } from '@/api/http';
+import { ApiError, conCopiaOffline } from '@/api/http';
 import { diaLima, horaLima, soles, segundosHasta, ETIQUETA_ESTADO } from '@/lib/format';
 import { ReprogramarModal, AsistenciaModal, ReembolsosModal } from '@/components/citas/ModalesCita';
 import { puedeReprogramar, puedeResponderAsistencia, puedeVerReembolsos } from '@/components/citas/reglas';
@@ -192,7 +192,8 @@ export default function PatientAppointments() {
     setSelectedDentistName,
   } = useApp();
   const [period, setPeriod] = useState<'upcoming' | 'past'>('upcoming');
-  const citas = useAsync(() => misCitas(), []);
+  // DEF-08: sin conexión muestra la última copia guardada de las citas (la misma que guarda el store).
+  const citas = useAsync(() => conCopiaOffline('citas', misCitas), []);
   const appointments = useMemo(() => (citas.data ?? []).map(aFila), [citas.data]);
   const upcoming = appointments.filter((a) => a.period === 'upcoming');
   const past = appointments.filter((a) => a.period === 'past');
