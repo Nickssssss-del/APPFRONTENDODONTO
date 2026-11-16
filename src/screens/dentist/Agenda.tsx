@@ -3,13 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock, AlertCircle, ChevronDown, ChevronUp, ShieldCheck, Phone, Mail, MessageCircle, CheckCircle2, XCircle, FileText,
 } from 'lucide-react';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, Modal } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import {
   agendaOdontologo, confirmarCita, completarCita, marcarInasistencia, type CitaApi, type EstadoCita,
 } from '@/api/citas';
 import { ApiError, conCopiaOffline } from '@/api/http';
-import { diasAgendaOdontologo, rangoAgendaOdontologo, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
+import { diasAgendaOdontologo, rangoAgendaOdontologo, fechaIsoLima, horaLima, diaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
 
 type Variante = 'success' | 'primary' | 'warning' | 'error' | 'neutral';
 const statusConfig: Record<EstadoCita, { variant: Variante; dot: string }> = {
@@ -40,6 +40,7 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [accionEn, setAccionEn] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  const [inasistenciaCita, setInasistenciaCita] = useState<CitaApi | null>(null);
 
   // Ventana de 62 días (ayer → hoy+60), el máximo que acepta el backend. `hasta` es exclusivo.
   // Sin conexión muestra la última agenda guardada (lib/offline).
@@ -242,7 +243,7 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
                               variant="outline"
                               disabled={ocupado || !yaEmpezo(c)}
                               title={yaEmpezo(c) ? undefined : 'Disponible cuando empiece la cita'}
-                              onClick={() => ejecutar(c, marcarInasistencia)}
+                              onClick={() => setInasistenciaCita(c)}
                             >
                               <XCircle className="w-4 h-4" /> No asistió
                             </Button>
@@ -263,6 +264,33 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
           })}
         </div>
       )}
+
+      {/* Modal de confirmación de inasistencia */}
+      <Modal
+        open={!!inasistenciaCita}
+        onClose={() => !accionEn && setInasistenciaCita(null)}
+        title="Registrar inasistencia"
+      >
+        {inasistenciaCita && (
+          <div className="space-y-4">
+            <p className="text-sm text-slatey-600">
+              ¿Confirmas que <strong>{inasistenciaCita.paciente?.nombre ?? 'el paciente'}</strong> no asistió a la cita del{' '}
+              {diaLima(inasistenciaCita.inicio)} a las {horaLima(inasistenciaCita.inicio)}?
+            </p>
+            <p className="text-xs text-slatey-500">
+              La cita se marcará como inasistencia y no se podrá deshacer.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setInasistenciaCita(null)} disabled={accionEn === inasistenciaCita.id}>
+                Cancelar
+              </Button>
+              <Button variant="danger" loading={accionEn === inasistenciaCita.id} onClick={() => ejecutar(inasistenciaCita, marcarInasistencia)}>
+                Confirmar inasistencia
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
