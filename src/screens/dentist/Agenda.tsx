@@ -11,6 +11,9 @@ import {
 import { ApiError, conCopiaOffline } from '@/api/http';
 import { diasAgendaOdontologo, rangoAgendaOdontologo, fechaIsoLima, horaLima, diaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
 
+/** Tolerancia antes de poder marcar inasistencia: la misma que aplica el backend (15 min). */
+const TOLERANCIA_INASISTENCIA_MS = 15 * 60_000;
+
 type Variante = 'success' | 'primary' | 'warning' | 'error' | 'neutral';
 const statusConfig: Record<EstadoCita, { variant: Variante; dot: string }> = {
   PENDIENTE_PAGO: { variant: 'warning', dot: 'bg-accent-500' },
@@ -66,7 +69,18 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
     }
   };
 
-  const yaEmpezo = (c: CitaApi) => new Date(c.inicio).getTime() <= Date.now();
+  // Reloj de la pantalla: cada 30 s se vuelve a evaluar qué acciones están disponibles,
+  // así los botones se habilitan solos cuando llega la hora (sin recargar la agenda).
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setAhora(Date.now()), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const inicioMs = (c: CitaApi) => new Date(c.inicio).getTime();
+  /** «Atendida»: el backend la rechaza (409) si la cita todavía no empieza (CitaService.completar). */
+  const yaEmpezo = (c: CitaApi) => inicioMs(c) <= ahora;
+  /** «No asistió»: el backend exige que pasen los 15 min de tolerancia (CitaService.marcarInasistencia). */
+  const toleranciaVencida = (c: CitaApi) => inicioMs(c) + TOLERANCIA_INASISTENCIA_MS <= ahora;
 
   return (
     <div className="space-y-4">
@@ -235,18 +249,37 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
                         )}
 
                         {c.estado === 'CONFIRMADA' && (
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button loading={ocupado} onClick={() => ejecutar(c, completarCita)}>
-                              <CheckCircle2 className="w-4 h-4" /> Atendida
-                            </Button>
-                            <Button
-                              variant="outline"
-                              disabled={ocupado || !yaEmpezo(c)}
-                              title={yaEmpezo(c) ? undefined : 'Disponible cuando empiece la cita'}
-                              onClick={() => setInasistenciaCita(c)}
-                            >
-                              <XCircle className="w-4 h-4" /> No asistió
-                            </Button>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <Button
+                                loading={ocupado}
+                                disabled={!yaEmpezo(c)}
+                                title={yaEmpezo(c) ? undefined : 'Disponible cuando empiece la cita'}
+                                onClick={() => ejecutar(c, completarCita)}
+                                className="min-w-0"
+                              >
+                                <CheckCircle2 className="w-4 h-4" /> Atendida
+                              </Button>
+                              <Button
+                                variant="outline"
+                                disabled={ocupado || !toleranciaVencida(c)}
+                                title={toleranciaVencida(c) ? undefined : 'Disponible 15 min después del inicio'}
+                                onClick={() => setInasistenciaCita(c)}
+                                className="min-w-0"
+                              >
+                                <XCircle className="w-4 h-4" /> No asistió
+                              </Button>
+                            </div>
+                            {/* En el celular no hay tooltip: se explica en texto por qué un botón está deshabilitado. */}
+                            {!yaEmpezo(c) ? (
+                              <p className="text-xs text-slatey-500">
+                                Podrás marcarla como atendida desde las {horaLima(c.inicio)}.
+                              </p>
+                            ) : !toleranciaVencida(c) ? (
+                              <p className="text-xs text-slatey-500">
+                                «No asistió» se habilita a las {horaLima(new Date(inicioMs(c) + TOLERANCIA_INASISTENCIA_MS).toISOString())} (15 min de tolerancia).
+                              </p>
+                            ) : null}
                           </div>
                         )}
 
@@ -280,11 +313,11 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
             <p className="text-xs text-slatey-500">
               La cita se marcará como inasistencia y no se podrá deshacer.
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" onClick={() => setInasistenciaCita(null)} disabled={accionEn === inasistenciaCita.id}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setInasistenciaCita(null)} disabled={accionEn === inasistenciaCita.id} className="min-w-0">
                 Cancelar
               </Button>
-              <Button variant="danger" loading={accionEn === inasistenciaCita.id} onClick={() => ejecutar(inasistenciaCita, marcarInasistencia)}>
+              <Button variant="danger" loading={accionEn === inasistenciaCita.id} onClick={() => ejecutar(inasistenciaCita, marcarInasistencia)} className="min-w-0">
                 Confirmar inasistencia
               </Button>
             </div>

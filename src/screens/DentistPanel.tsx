@@ -30,11 +30,12 @@ export default function DentistPanel() {
 
   const cerrarFicha = () => setSelectedPatientId(null);
   const showPatientDetail = selectedPatientId !== null;
-  // pb-40: deja espacio para la barra inferior y el botón flotante de OdontoBot, que así no tapa la última tarjeta.
+  // pb-40 + zona segura: deja espacio para la barra inferior y el botón flotante de OdontoBot,
+  // que así no tapan la última tarjeta al desplazarse hasta el final.
   return (
-    <div className="min-h-screen bg-slatey-50 pb-40">
+    <div className="min-h-dvh bg-slatey-50 pb-[calc(10rem+env(safe-area-inset-bottom))]">
       {/* Header */}
-      <div className="sticky top-0 z-30 glass border-b border-slatey-100">
+      <div className="sticky top-0 z-30 glass border-b border-slatey-100 safe-area-top">
         <div className="flex items-center justify-between px-4 py-3 horizontal:py-1.5 max-w-md horizontal:max-w-3xl mx-auto">
           <div className="flex items-center gap-3 min-w-0">
             <SmartImage src={user.photoUrl} alt={nombre || 'Odontólogo'} ratio="1/1" fallback="avatar" gravity="face" widths={[80, 160]} sizes="40px" className="w-10 h-10 rounded-xl flex-shrink-0" />
@@ -95,7 +96,7 @@ export default function DentistPanel() {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-30">
+      <div className="fixed bottom-0 left-0 right-0 z-30 safe-area-bottom">
           <nav aria-label="Secciones del consultorio" className="max-w-md horizontal:max-w-3xl mx-auto bg-white border-t border-slatey-100 px-2 py-2 horizontal:py-0.5 flex justify-around items-center">
             {TABS.map((tab) => {
               const Icon = tab.icon;
