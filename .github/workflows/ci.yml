@@ -1,0 +1,44 @@
+# CI de la app móvil: en cada pull request y en cada push a main comprueba que el código
+# pase los tipos, el lint y las pruebas, y que la web de la app compile.
+# No genera el APK: eso se hace a mano con Android Studio (docs/DESPLIEGUE.md, sección 4).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Tipos, lint, pruebas y build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tipos (TypeScript)
+        run: npm run typecheck
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Pruebas (Vitest)
+        run: npm run test
+
+      - name: Build de la web de la app
+        run: npm run build
