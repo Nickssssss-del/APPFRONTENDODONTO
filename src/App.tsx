@@ -170,7 +170,7 @@ function AppContent() {
   if (SHOW_DIAGNOSTICO) {
     return (
       <div className="min-h-screen bg-slatey-100">
-        <div className="w-full max-w-md mx-auto min-h-screen bg-slatey-50 relative shadow-xl">
+        <div className="w-full max-w-md horizontal:max-w-3xl mx-auto min-h-screen bg-slatey-50 relative shadow-xl">
           <DiagnosticoConexion />
         </div>
       </div>
@@ -181,7 +181,7 @@ function AppContent() {
     <TourProvider>
       <div className="h-full bg-slatey-100">
         {/* Mobile app container - full width, no sidebar */}
-        <div className="flex h-full w-full max-w-md mx-auto flex-col bg-slatey-50 relative shadow-xl">
+        <div className="flex h-full w-full max-w-md horizontal:max-w-3xl mx-auto flex-col bg-slatey-50 relative shadow-xl">
           <AvisoSinConexion />
           <ErrorBoundary>
             <AnimatePresence mode="wait">

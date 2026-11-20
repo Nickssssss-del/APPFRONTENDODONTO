@@ -20,8 +20,8 @@ export default function PatientBottomNav() {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none">
-      <div className="w-full max-w-md px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pointer-events-auto">
-        <div className="relative flex items-center justify-between gap-1 rounded-3xl bg-white/95 backdrop-blur-xl shadow-xl shadow-slatey-900/10 border border-slatey-100 px-2 py-2">
+      <div className="w-full max-w-md horizontal:max-w-3xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] horizontal:pb-[max(0.25rem,env(safe-area-inset-bottom))] pointer-events-auto">
+        <div className="relative flex items-center justify-between gap-1 rounded-3xl bg-white/95 backdrop-blur-xl shadow-xl shadow-slatey-900/10 border border-slatey-100 px-2 py-2 horizontal:py-1">
 {NAV_ITEMS.map((item) => {
              const active = screen === item.key;
              const isCenter = item.key === 'chatbot';
@@ -40,7 +40,7 @@ export default function PatientBottomNav() {
                   <motion.div
                     whileHover={{ scale: 1.08 }}
                     whileTap={{ scale: 0.92 }}
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-200 ${
+                    className={`w-12 h-12 horizontal:w-10 horizontal:h-10 rounded-2xl flex items-center justify-center shadow-lg transition-all duration-200 ${
                       active ? 'bg-gradient-to-br from-primary-500 to-success-500 shadow-primary-500/40' : 'bg-primary-500 shadow-primary-500/30'
                     }`}
                   >

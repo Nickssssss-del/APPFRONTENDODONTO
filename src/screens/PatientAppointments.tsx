@@ -249,7 +249,7 @@ export default function PatientAppointments() {
   return (
     <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
       <div className="sticky top-0 z-30 border-b border-slatey-100 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-md items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-md horizontal:max-w-3xl items-center justify-between px-4 py-3 horizontal:py-1.5">
           <div>
             <h2 className="text-lg font-bold text-slatey-900 font-display">Mis citas</h2>
             <p className="text-xs text-slatey-500">{user.fullName || 'Paciente'} · Próximas y pasadas</p>
@@ -267,7 +267,7 @@ export default function PatientAppointments() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-md space-y-5 px-4 py-5">
+      <div className="mx-auto max-w-md horizontal:max-w-3xl space-y-5 px-4 py-5">
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-2xl border border-primary-100 bg-gradient-to-br from-primary-50 to-white p-4">
             <div className="flex items-center gap-2 text-primary-600">
@@ -332,7 +332,7 @@ export default function PatientAppointments() {
             )}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 horizontal:grid horizontal:grid-cols-2 horizontal:items-start horizontal:gap-3 horizontal:space-y-0">
             {visibleAppointments.map((appointment) => (
               <AppointmentCard
                 key={appointment.id}

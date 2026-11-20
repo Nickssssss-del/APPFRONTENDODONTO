@@ -128,7 +128,7 @@ export default function DiagnosticoConexion() {
   };
 
   return (
-    <div className="mx-auto min-h-screen max-w-md bg-slate-50 p-4 text-slate-900">
+    <div className="mx-auto min-h-screen max-w-md horizontal:max-w-3xl bg-slate-50 p-4 text-slate-900">
       <h1 className="text-lg font-extrabold">Diagnóstico de conexión</h1>
       <p className="mb-4 text-xs text-slate-500">App → backend → base de datos → Cloudinary. Esta pantalla es solo para pruebas.</p>
 

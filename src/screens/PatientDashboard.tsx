@@ -146,7 +146,7 @@ export default function PatientDashboard() {
   return (
     <div className="h-full overflow-y-auto overscroll-y-contain bg-slatey-50 pb-28">
       <div className="sticky top-0 z-30 glass border-b border-slatey-100 bg-white/80 backdrop-blur-md">
-        <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
+        <div className="flex items-center justify-between px-4 py-3 horizontal:py-1.5 max-w-md horizontal:max-w-3xl mx-auto">
           <div className="min-w-0">
             <p className="text-xs text-slatey-500">Hola,</p>
             <h2 className="text-lg font-bold text-slatey-900 font-display truncate">{user.fullName || 'Paciente'}</h2>
@@ -157,7 +157,7 @@ export default function PatientDashboard() {
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-5 space-y-5">
+      <div className="max-w-md horizontal:max-w-3xl mx-auto px-4 py-5 space-y-5">
         {/* Próxima cita */}
         {proxima ? (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-gradient-to-br from-primary-500 to-primary-600 rounded-3xl p-5 text-white shadow-lg shadow-primary-500/20">
@@ -245,7 +245,7 @@ export default function PatientDashboard() {
               <p className="text-xs text-slatey-500">{coords ? `No hay odontólogos verificados en ${RADIO_CERCANOS_KM} km a tu alrededor.` : 'Aún no hay odontólogos verificados disponibles.'}</p>
             </div>
           )}
-          <div className="space-y-3">
+          <div className="space-y-3 horizontal:grid horizontal:grid-cols-2 horizontal:items-start horizontal:gap-3 horizontal:space-y-0">
             {lista.map((o) => {
               const esMasCercano = o.id === masCercano?.id;
               return (

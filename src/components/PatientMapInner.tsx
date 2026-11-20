@@ -54,6 +54,45 @@ function EncuadreRuta({ puntos }: { puntos: LatLngExpression[] }) {
   return null;
 }
 
+/**
+ * OBS-10: al girar el celular (o cambiar el tamaño de la ventana) el contenedor del mapa cambia de tamaño y
+ * Leaflet conserva el encuadre anterior, así que la ruta y los pines quedan fuera de la vista.
+ * Observa el tamaño del contenedor y, cuando cambia, recalcula el tamaño del mapa y vuelve a encuadrar.
+ */
+export function EncuadreAlRedimensionar({ puntos, padding, maxZoom }: { puntos: LatLngExpression[]; padding: number; maxZoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    if (puntos.length === 0) return;
+    const contenedor = map.getContainer();
+    let ancho = contenedor.clientWidth;
+    let alto = contenedor.clientHeight;
+    let pendiente = 0;
+    const reencuadrar = () => {
+      if (contenedor.clientWidth === ancho && contenedor.clientHeight === alto) return;
+      ancho = contenedor.clientWidth;
+      alto = contenedor.clientHeight;
+      window.clearTimeout(pendiente);
+      // Espera a que termine el giro de pantalla antes de medir de nuevo.
+      pendiente = window.setTimeout(() => {
+        map.invalidateSize();
+        if (puntos.length === 1) map.setView(puntos[0], 14, { animate: false });
+        else map.fitBounds(L.latLngBounds(puntos), { padding: [padding, padding], maxZoom, animate: false });
+      }, 150);
+    };
+    const observador = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(reencuadrar) : null;
+    observador?.observe(contenedor);
+    window.addEventListener('orientationchange', reencuadrar);
+    window.addEventListener('resize', reencuadrar);
+    return () => {
+      observador?.disconnect();
+      window.removeEventListener('orientationchange', reencuadrar);
+      window.removeEventListener('resize', reencuadrar);
+      window.clearTimeout(pendiente);
+    };
+  }, [map, puntos, padding, maxZoom]);
+  return null;
+}
+
 interface Props {
   dentists: PinOdontologo[];
   userLocation: { lat: number; lng: number } | null;
@@ -116,7 +155,7 @@ export default function PatientMapInner({
 
   return (
     <div className="space-y-2">
-      <div className="relative h-[38dvh] min-h-[220px] max-h-80 overflow-hidden rounded-2xl border border-slatey-100 bg-slatey-50">
+      <div className="relative h-[38dvh] min-h-[220px] max-h-80 horizontal:h-[60dvh] horizontal:min-h-[180px] overflow-hidden rounded-2xl border border-slatey-100 bg-slatey-50">
         {puntos.length === 0 ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slatey-500">
             {ubicacion === 'cargando' ? 'Buscando tu ubicación…' : 'No hay consultorios con coordenadas para mostrar en el mapa.'}
@@ -133,6 +172,12 @@ export default function PatientMapInner({
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
             <Encuadre puntos={puntos} />
+            {/* Con ruta se reencuadra el recorrido completo; sin ruta, los pines. */}
+            {rutaReal ? (
+              <EncuadreAlRedimensionar puntos={puntosConRuta} padding={36} maxZoom={16} />
+            ) : (
+              <EncuadreAlRedimensionar puntos={puntos} padding={28} maxZoom={15} />
+            )}
             {rutaReal && (
               <>
                 {/* Base clara + trazo animado encima: se lee como «camino hacia el consultorio». */}

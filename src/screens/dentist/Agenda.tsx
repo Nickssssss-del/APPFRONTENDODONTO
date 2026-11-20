@@ -3,13 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Clock, AlertCircle, ChevronDown, ChevronUp, ShieldCheck, Phone, Mail, MessageCircle, CheckCircle2, XCircle, FileText,
 } from 'lucide-react';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, Modal } from '@/components/ui';
 import { useAsync } from '@/hooks/useAsync';
 import {
   agendaOdontologo, confirmarCita, completarCita, marcarInasistencia, type CitaApi, type EstadoCita,
 } from '@/api/citas';
 import { ApiError, conCopiaOffline } from '@/api/http';
-import { diasAgendaOdontologo, rangoAgendaOdontologo, fechaIsoLima, horaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
+import { diasAgendaOdontologo, rangoAgendaOdontologo, fechaIsoLima, horaLima, diaLima, soles, ETIQUETA_ESTADO } from '@/lib/format';
+
+/** Tolerancia antes de poder marcar inasistencia: la misma que aplica el backend (15 min). */
+const TOLERANCIA_INASISTENCIA_MS = 15 * 60_000;
 
 type Variante = 'success' | 'primary' | 'warning' | 'error' | 'neutral';
 const statusConfig: Record<EstadoCita, { variant: Variante; dot: string }> = {
@@ -40,6 +43,7 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [accionEn, setAccionEn] = useState<string | null>(null);
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
+  const [inasistenciaCita, setInasistenciaCita] = useState<CitaApi | null>(null);
 
   // Ventana de 62 días (ayer → hoy+60), el máximo que acepta el backend. `hasta` es exclusivo.
   // Sin conexión muestra la última agenda guardada (lib/offline).
@@ -65,7 +69,18 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
     }
   };
 
-  const yaEmpezo = (c: CitaApi) => new Date(c.inicio).getTime() <= Date.now();
+  // Reloj de la pantalla: cada 30 s se vuelve a evaluar qué acciones están disponibles,
+  // así los botones se habilitan solos cuando llega la hora (sin recargar la agenda).
+  const [ahora, setAhora] = useState(() => Date.now());
+  useEffect(() => {
+    const t = window.setInterval(() => setAhora(Date.now()), 30_000);
+    return () => window.clearInterval(t);
+  }, []);
+  const inicioMs = (c: CitaApi) => new Date(c.inicio).getTime();
+  /** «Atendida»: el backend la rechaza (409) si la cita todavía no empieza (CitaService.completar). */
+  const yaEmpezo = (c: CitaApi) => inicioMs(c) <= ahora;
+  /** «No asistió»: el backend exige que pasen los 15 min de tolerancia (CitaService.marcarInasistencia). */
+  const toleranciaVencida = (c: CitaApi) => inicioMs(c) + TOLERANCIA_INASISTENCIA_MS <= ahora;
 
   return (
     <div className="space-y-4">
@@ -137,7 +152,7 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
 
       {/* Appointment Cards */}
       {!agenda.loading && !agenda.error && (
-        <div className="space-y-3">
+        <div className="space-y-3 horizontal:grid horizontal:grid-cols-2 horizontal:items-start horizontal:gap-3 horizontal:space-y-0">
           {citasDelDia.map((c, i) => {
             const isExpanded = expandedId === c.id;
             const status = statusConfig[c.estado];
@@ -234,18 +249,37 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
                         )}
 
                         {c.estado === 'CONFIRMADA' && (
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button loading={ocupado} onClick={() => ejecutar(c, completarCita)}>
-                              <CheckCircle2 className="w-4 h-4" /> Atendida
-                            </Button>
-                            <Button
-                              variant="outline"
-                              disabled={ocupado || !yaEmpezo(c)}
-                              title={yaEmpezo(c) ? undefined : 'Disponible cuando empiece la cita'}
-                              onClick={() => ejecutar(c, marcarInasistencia)}
-                            >
-                              <XCircle className="w-4 h-4" /> No asistió
-                            </Button>
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <Button
+                                loading={ocupado}
+                                disabled={!yaEmpezo(c)}
+                                title={yaEmpezo(c) ? undefined : 'Disponible cuando empiece la cita'}
+                                onClick={() => ejecutar(c, completarCita)}
+                                className="min-w-0"
+                              >
+                                <CheckCircle2 className="w-4 h-4" /> Atendida
+                              </Button>
+                              <Button
+                                variant="outline"
+                                disabled={ocupado || !toleranciaVencida(c)}
+                                title={toleranciaVencida(c) ? undefined : 'Disponible 15 min después del inicio'}
+                                onClick={() => setInasistenciaCita(c)}
+                                className="min-w-0"
+                              >
+                                <XCircle className="w-4 h-4" /> No asistió
+                              </Button>
+                            </div>
+                            {/* En el celular no hay tooltip: se explica en texto por qué un botón está deshabilitado. */}
+                            {!yaEmpezo(c) ? (
+                              <p className="text-xs text-slatey-500">
+                                Podrás marcarla como atendida desde las {horaLima(c.inicio)}.
+                              </p>
+                            ) : !toleranciaVencida(c) ? (
+                              <p className="text-xs text-slatey-500">
+                                «No asistió» se habilita a las {horaLima(new Date(inicioMs(c) + TOLERANCIA_INASISTENCIA_MS).toISOString())} (15 min de tolerancia).
+                              </p>
+                            ) : null}
                           </div>
                         )}
 
@@ -263,6 +297,33 @@ export default function Agenda({ onGoToPatient }: AgendaProps) {
           })}
         </div>
       )}
+
+      {/* Modal de confirmación de inasistencia */}
+      <Modal
+        open={!!inasistenciaCita}
+        onClose={() => !accionEn && setInasistenciaCita(null)}
+        title="Registrar inasistencia"
+      >
+        {inasistenciaCita && (
+          <div className="space-y-4">
+            <p className="text-sm text-slatey-600">
+              ¿Confirmas que <strong>{inasistenciaCita.paciente?.nombre ?? 'el paciente'}</strong> no asistió a la cita del{' '}
+              {diaLima(inasistenciaCita.inicio)} a las {horaLima(inasistenciaCita.inicio)}?
+            </p>
+            <p className="text-xs text-slatey-500">
+              La cita se marcará como inasistencia y no se podrá deshacer.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setInasistenciaCita(null)} disabled={accionEn === inasistenciaCita.id} className="min-w-0">
+                Cancelar
+              </Button>
+              <Button variant="danger" loading={accionEn === inasistenciaCita.id} onClick={() => ejecutar(inasistenciaCita, marcarInasistencia)} className="min-w-0">
+                Confirmar inasistencia
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

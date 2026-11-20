@@ -102,7 +102,7 @@ export default function Chatbot() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slatey-50 max-w-md mx-auto relative overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col bg-slatey-50 max-w-md horizontal:max-w-3xl mx-auto relative overflow-hidden">
       {/* Header */}
       <div className="sticky top-0 z-30 glass border-b border-slatey-100 bg-white/80 backdrop-blur-md">
         <div className="flex items-center gap-3 px-4 py-3">

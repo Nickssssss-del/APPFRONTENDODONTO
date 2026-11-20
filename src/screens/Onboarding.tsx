@@ -197,9 +197,9 @@ export default function Onboarding() {
   return (
     <div className="min-h-screen bg-slatey-50 flex flex-col justify-center px-4 py-8 relative overflow-hidden">
       {/* Background Decorator */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-md h-64 bg-gradient-to-b from-primary-50 to-transparent -z-10" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-md horizontal:max-w-3xl h-64 bg-gradient-to-b from-primary-50 to-transparent -z-10" />
 
-      <div className="max-w-md mx-auto w-full space-y-6">
+      <div className="max-w-md horizontal:max-w-3xl mx-auto w-full space-y-6">
         {/* Header App Brand */}
         <div className="flex items-center gap-3">
           <motion.div

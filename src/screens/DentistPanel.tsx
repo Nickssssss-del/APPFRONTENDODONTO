@@ -30,12 +30,13 @@ export default function DentistPanel() {
 
   const cerrarFicha = () => setSelectedPatientId(null);
   const showPatientDetail = selectedPatientId !== null;
-  // pb-40: deja espacio para la barra inferior y el botón flotante de OdontoBot, que así no tapa la última tarjeta.
+  // pb-40 + zona segura: deja espacio para la barra inferior y el botón flotante de OdontoBot,
+  // que así no tapan la última tarjeta al desplazarse hasta el final.
   return (
-    <div className="min-h-screen bg-slatey-50 pb-40">
+    <div className="min-h-dvh bg-slatey-50 pb-[calc(10rem+env(safe-area-inset-bottom))]">
       {/* Header */}
-      <div className="sticky top-0 z-30 glass border-b border-slatey-100">
-        <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
+      <div className="sticky top-0 z-30 glass border-b border-slatey-100 safe-area-top">
+        <div className="flex items-center justify-between px-4 py-3 horizontal:py-1.5 max-w-md horizontal:max-w-3xl mx-auto">
           <div className="flex items-center gap-3 min-w-0">
             <SmartImage src={user.photoUrl} alt={nombre || 'Odontólogo'} ratio="1/1" fallback="avatar" gravity="face" widths={[80, 160]} sizes="40px" className="w-10 h-10 rounded-xl flex-shrink-0" />
             <div className="min-w-0">
@@ -57,7 +58,7 @@ export default function DentistPanel() {
       </div>
 
       {/* Content */}
-      <div className="max-w-md mx-auto px-4 py-5">
+      <div className="max-w-md horizontal:max-w-3xl mx-auto px-4 py-5">
         <AnimatePresence mode="wait">
           {showPatientDetail ? (
             <motion.div
@@ -95,8 +96,8 @@ export default function DentistPanel() {
       </div>
 
       {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 z-30">
-          <nav aria-label="Secciones del consultorio" className="max-w-md mx-auto bg-white border-t border-slatey-100 px-2 py-2 flex justify-around items-center">
+      <div className="fixed bottom-0 left-0 right-0 z-30 safe-area-bottom">
+          <nav aria-label="Secciones del consultorio" className="max-w-md horizontal:max-w-3xl mx-auto bg-white border-t border-slatey-100 px-2 py-2 horizontal:py-0.5 flex justify-around items-center">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               const active = !showPatientDetail && dentistTab === tab.id;
@@ -105,7 +106,7 @@ export default function DentistPanel() {
                   key={tab.id}
                   onClick={() => { cerrarFicha(); setDentistTab(tab.id); }}
                   aria-current={active ? 'page' : undefined}
-                  className="relative flex min-h-[44px] min-w-[44px] flex-col items-center gap-1 px-2 py-2 transition-colors"
+                  className="relative flex min-h-[44px] min-w-[44px] flex-col items-center gap-1 px-2 py-2 horizontal:min-h-[40px] horizontal:py-1 transition-colors"
                 >
                   {active && (
                     <motion.div
@@ -127,7 +128,7 @@ export default function DentistPanel() {
       <button
         onClick={() => setScreen('chatbot')}
         aria-label="Abrir OdontoBot"
-        className="fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full bg-primary-500 shadow-xl shadow-primary-500/30 flex items-center justify-center hover:scale-105 transition-transform"
+        className="fixed bottom-24 right-4 z-30 w-14 h-14 horizontal:bottom-16 horizontal:w-12 horizontal:h-12 rounded-full bg-primary-500 shadow-xl shadow-primary-500/30 flex items-center justify-center hover:scale-105 transition-transform"
         data-testid="dentist-chatbot-fab"
       >
         <Bot className="w-6 h-6 text-white" />

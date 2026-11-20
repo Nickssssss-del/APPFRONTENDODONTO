@@ -221,7 +221,7 @@ type TopBarProps = {
 export function TopBar({ title, onBack, rightAction }: TopBarProps) {
   return (
     <div className="sticky top-0 z-30 glass border-b border-slatey-100">
-      <div className="flex items-center justify-between px-4 py-3 max-w-md mx-auto">
+      <div className="flex items-center justify-between px-4 py-3 horizontal:py-1.5 max-w-md horizontal:max-w-3xl mx-auto">
         <div className="flex items-center gap-3">
           {onBack && (
             <button onClick={onBack} aria-label="Volver" className="p-2.5 -ml-2 rounded-xl hover:bg-slatey-100 transition-colors">

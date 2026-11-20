@@ -20,7 +20,7 @@ export function TabBar({ active, onChange }: Props) {
       aria-label="Secciones del perfil"
       className="sticky top-0 z-20 bg-white border-b border-slatey-100"
     >
-      <div className="max-w-md mx-auto flex overflow-x-auto scrollbar-hide">
+      <div className="max-w-md horizontal:max-w-3xl mx-auto flex overflow-x-auto scrollbar-hide">
         {TABS.map((tab) => {
           const selected = active === tab.id;
           return (
